@@ -1,10 +1,10 @@
 <script lang="ts">
-  /** Footer with GitHub repo link and Sign up on Render (UTM-tagged). */
+  /** Footer with GitHub and Workflows docs (centered, sticky via page flex). */
+  const WORKFLOWS_DOCS_URL = "https://render.com/docs/workflows";
+
   let {
-    signupUrl,
     githubRepo,
   }: {
-    signupUrl: string;
     githubRepo: string;
   } = $props();
 </script>
@@ -14,8 +14,8 @@
     <a class="footer-link" href={githubRepo} target="_blank" rel="noopener noreferrer">
       GitHub repository
     </a>
-    <a class="footer-link" href={signupUrl} target="_blank" rel="noopener noreferrer">
-      Sign up on Render
+    <a class="footer-link" href={WORKFLOWS_DOCS_URL} target="_blank" rel="noopener noreferrer">
+      Workflows docs
     </a>
   </div>
 </footer>
