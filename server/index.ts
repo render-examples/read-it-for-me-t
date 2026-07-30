@@ -24,6 +24,7 @@ app.get("/api/config", (_req, res) => {
     githubRepo: GITHUB_REPO,
     deployUrl: deployToRenderUrl(GITHUB_REPO),
     signupNavbar: renderSignupUrlWithUtms("navbar_button"),
+    workflowTimeline: process.env.ENABLE_WORKFLOW_TIMELINE !== "0",
   });
 });
 

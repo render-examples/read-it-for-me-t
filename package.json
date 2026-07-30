@@ -18,7 +18,8 @@
     "start": "node dist/server/index.js",
     "workflow:start": "node dist/workflow/index.js",
     "dev": "concurrently -k -n server,vite -c blue,green \"tsx watch server/index.ts\" \"vite\"",
-    "dev:workflow": "tsx watch workflow/index.ts"
+    "dev:workflow": "tsx watch workflow/index.ts",
+    "test": "tsx --test frontend/src/modules/workflow-timeline/build.test.ts"
   },
   "engines": {
     "node": ">=20"

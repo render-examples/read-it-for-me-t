@@ -4,10 +4,12 @@ import { Render } from "@renderinc/sdk";
 import type {
   DigestItemInput,
   DigestResult,
+  DigestStageName,
   DigestSummary,
   ItemAnalysis,
   SseActivityPayload,
   SseProgressPayload,
+  SseStagePayload,
 } from "../../shared/types.js";
 import { createRun, getPriorSnapshot, saveRun } from "./db.js";
 
@@ -51,6 +53,12 @@ function itemLabel(item: DigestItemInput): string {
   return item.filename;
 }
 
+function rowLabelForItem(item: DigestItemInput, index: number): string {
+  if (item.kind === "url") return safeHostname(item.value);
+  if (item.kind === "text") return `Text ${index + 1}`;
+  return item.filename.slice(0, 28);
+}
+
 function activity(
   message: string,
   kind: SseActivityPayload["kind"] = "info"
@@ -67,6 +75,10 @@ function progress(task: string, message: string, elapsedSec: number): StreamChun
     event: "progress",
     data: { task, message, elapsedSec } satisfies SseProgressPayload,
   };
+}
+
+function stage(payload: SseStagePayload): StreamChunk {
+  return { event: "stage", data: payload };
 }
 
 function taskStatusLabel(status: string): string {
@@ -89,40 +101,77 @@ function taskStatusLabel(status: string): string {
 async function* runTask<T>(
   taskName: string,
   label: string,
-  args: unknown[]
+  args: unknown[],
+  meta: { rowId: string; rowLabel: string; stage: DigestStageName }
 ): AsyncGenerator<StreamChunk, T, undefined> {
+  const attempt = 1;
+  const stageStartedAt = Date.now();
+  yield stage({
+    rowId: meta.rowId,
+    rowLabel: meta.rowLabel,
+    stage: meta.stage,
+    status: "started",
+    at: new Date(stageStartedAt).toISOString(),
+    attempt,
+  });
   yield activity(`Starting ${label}`, "info");
 
-  const started = await getRender().workflows.startTask(`${WORKFLOW_SLUG}/${taskName}`, args);
-  yield activity(`Task run ${started.taskRunId.slice(-8)} created`, "info");
+  try {
+    const started = await getRender().workflows.startTask(`${WORKFLOW_SLUG}/${taskName}`, args);
+    yield activity(`Task run ${started.taskRunId.slice(-8)} created`, "info");
 
-  const startedAt = Date.now();
-  let lastStatus = "";
+    const startedAt = Date.now();
+    let lastStatus = "";
 
-  // Poll Render until the task finishes; yield activity/progress on each tick.
-  while (true) {
-    await new Promise((r) => setTimeout(r, POLL_MS));
-    const details = await getRender().workflows.getTaskRun(started.taskRunId);
-    const elapsedSec = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+    // Poll Render until the task finishes; yield activity/progress on each tick.
+    while (true) {
+      await new Promise((r) => setTimeout(r, POLL_MS));
+      const details = await getRender().workflows.getTaskRun(started.taskRunId);
+      const elapsedSec = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
 
-    if (details.status !== lastStatus) {
-      lastStatus = details.status;
-      yield activity(`${label}: ${taskStatusLabel(details.status)}`, "wait");
+      if (details.status !== lastStatus) {
+        lastStatus = details.status;
+        yield activity(`${label}: ${taskStatusLabel(details.status)}`, "wait");
+      }
+
+      if (details.status === "pending" || details.status === "running") {
+        yield progress(taskName, `${label} (${taskStatusLabel(details.status).toLowerCase()})`, elapsedSec);
+        continue;
+      }
+
+      if (details.status === "completed") {
+        const endedAt = Date.now();
+        yield stage({
+          rowId: meta.rowId,
+          rowLabel: meta.rowLabel,
+          stage: meta.stage,
+          status: "completed",
+          at: new Date(endedAt).toISOString(),
+          attempt,
+          latencyMs: endedAt - stageStartedAt,
+        });
+        yield activity(`${label} finished in ${elapsedSec}s`, "success");
+        return (details.results?.[0] ?? null) as T;
+      }
+
+      if (details.status === "failed" || details.status === "canceled") {
+        throw new Error(details.error ?? `Task ${taskName} failed`);
+      }
     }
-
-    if (details.status === "pending" || details.status === "running") {
-      yield progress(taskName, `${label} (${taskStatusLabel(details.status).toLowerCase()})`, elapsedSec);
-      continue;
-    }
-
-    if (details.status === "completed") {
-      yield activity(`${label} finished in ${elapsedSec}s`, "success");
-      return (details.results?.[0] ?? null) as T;
-    }
-
-    if (details.status === "failed" || details.status === "canceled") {
-      throw new Error(details.error ?? `Task ${taskName} failed`);
-    }
+  } catch (err) {
+    const endedAt = Date.now();
+    const message = err instanceof Error ? err.message : String(err);
+    yield stage({
+      rowId: meta.rowId,
+      rowLabel: meta.rowLabel,
+      stage: meta.stage,
+      status: "failed",
+      at: new Date(endedAt).toISOString(),
+      attempt,
+      latencyMs: endedAt - stageStartedAt,
+      message,
+    });
+    throw err;
   }
 }
 
@@ -148,6 +197,8 @@ export async function* runDigest(
     const sourceKey = sourceKeyForItem(item, i);
     sourceKeys.push(sourceKey);
     const label = itemLabel(item);
+    const rowId = `item-${i}`;
+    const rowLabel = rowLabelForItem(item, i);
 
     yield {
       event: "status",
@@ -163,7 +214,8 @@ export async function* runDigest(
     const fetchRunner = runTask<{ title: string; text: string; sourceLabel: string }>(
       "fetch_item",
       item.kind === "url" ? `Fetch ${safeHostname(item.value)}` : `Load ${label.slice(0, 40)}`,
-      [item]
+      [item],
+      { rowId, rowLabel, stage: "fetch" }
     );
     let fetched!: { title: string; text: string; sourceLabel: string };
     // Drain the async generator so activity events reach the client while the task runs.
@@ -203,14 +255,19 @@ export async function* runDigest(
       },
     };
 
-    const analyzeRunner = runTask<ItemAnalysis>("analyze_item", "Together AI analysis", [
-      fetched.title,
-      fetched.sourceLabel,
-      fetched.text,
-      focus,
-      prior?.summary ?? null,
-      prior ? contentHash !== prior.contentHash : false,
-    ]);
+    const analyzeRunner = runTask<ItemAnalysis>(
+      "analyze_item",
+      "Together AI analysis",
+      [
+        fetched.title,
+        fetched.sourceLabel,
+        fetched.text,
+        focus,
+        prior?.summary ?? null,
+        prior ? contentHash !== prior.contentHash : false,
+      ],
+      { rowId, rowLabel, stage: "analyze" }
+    );
     let analyzed!: ItemAnalysis;
     while (true) {
       const step = await analyzeRunner.next();
@@ -231,7 +288,12 @@ export async function* runDigest(
     data: { phase: "synthesize", message: "Building your digest summary..." },
   };
 
-  const synthRunner = runTask<DigestSummary>("synthesize_digest", "Digest summary", [analyses, focus]);
+  const synthRunner = runTask<DigestSummary>(
+    "synthesize_digest",
+    "Digest summary",
+    [analyses, focus],
+    { rowId: "digest", rowLabel: "Digest", stage: "synthesize" }
+  );
   let summary!: DigestSummary;
   while (true) {
     const step = await synthRunner.next();

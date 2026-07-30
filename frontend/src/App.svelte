@@ -1,12 +1,23 @@
 <script lang="ts">
-  /** Main page: composer, live activity log, digest cards, and summary. */
-  import type { AppConfig, DigestResult, ItemAnalysis, SseActivityPayload, SseProgressPayload } from "./lib/api";
+  /** Main page: composer, live workflow timeline, digest cards, and summary. */
+  import type {
+    AppConfig,
+    DigestResult,
+    ItemAnalysis,
+    SseActivityPayload,
+    SseProgressPayload,
+    SseStagePayload,
+  } from "./lib/api";
   import { loadConfig, runDigestStream } from "./lib/api";
   import ActivityPanel from "./components/ActivityPanel.svelte";
   import DigestCard from "./components/DigestCard.svelte";
   import DigestSummary from "./components/DigestSummary.svelte";
   import Header from "./components/Header.svelte";
   import Footer from "./components/Footer.svelte";
+  import {
+    WorkflowTimeline,
+    type StageEvent,
+  } from "./modules/workflow-timeline";
 
   let config = $state<AppConfig | null>(null);
   let input = $state("");
@@ -17,6 +28,8 @@
   let error = $state("");
   let activities = $state<SseActivityPayload[]>([]);
   let progress = $state<SseProgressPayload | null>(null);
+  let stageEvents = $state<StageEvent[]>([]);
+  let stageSeq = $state(0);
   let cards = $state<ItemAnalysis[]>([]);
   let result = $state<DigestResult | null>(null);
 
@@ -46,6 +59,12 @@
 
   const hasResults = $derived(cards.length > 0 || result !== null);
   const showEmptyState = $derived(!hasResults && !running);
+  const showTimeline = $derived(
+    Boolean(config?.workflowTimeline) && (running || stageEvents.length > 0)
+  );
+  const showActivityFallback = $derived(
+    !config?.workflowTimeline && (running || activities.length > 0)
+  );
 
   $effect(() => {
     loadConfig()
@@ -68,6 +87,24 @@
     return { urls: urlLines.join("\n"), text: textLines.join("\n") };
   }
 
+  function appendStage(payload: SseStagePayload) {
+    stageSeq += 1;
+    stageEvents = [
+      ...stageEvents,
+      {
+        id: stageSeq,
+        rowId: payload.rowId,
+        rowLabel: payload.rowLabel,
+        stage: payload.stage,
+        status: payload.status,
+        at: payload.at,
+        attempt: payload.attempt,
+        latencyMs: payload.latencyMs,
+        message: payload.message,
+      },
+    ];
+  }
+
   async function submit() {
     if (!config || running) return;
     const trimmed = input.trim();
@@ -82,6 +119,8 @@
     result = null;
     activities = [];
     progress = null;
+    stageEvents = [];
+    stageSeq = 0;
     status = "Starting digest...";
 
     const { urls, text } = splitInput(input);
@@ -103,6 +142,7 @@
       onProgress: (p) => {
         progress = p;
       },
+      onStage: appendStage,
       onCard: (p) => {
         cards = [...cards, p];
       },
@@ -144,7 +184,7 @@
               </svg>
               <span>+</span>
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09-3.09z" />
               </svg>
             </p>
             <p>
@@ -156,7 +196,9 @@
           </section>
         {/if}
 
-        {#if running || activities.length}
+        {#if showTimeline}
+          <WorkflowTimeline events={stageEvents} active={running} headline={status || "Execution timeline"} />
+        {:else if showActivityFallback}
           <ActivityPanel {activities} {progress} headline={status} />
         {/if}
 
