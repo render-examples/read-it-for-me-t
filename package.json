@@ -6,10 +6,10 @@
   "homepage": "https://read-it-for-me.onrender.com/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ojusave/read-it-for-me"
+    "url": "https://github.com/render-examples/read-it-for-me-t"
   },
   "bugs": {
-    "url": "https://github.com/ojusave/read-it-for-me/issues"
+    "url": "https://github.com/render-examples/read-it-for-me-t/issues"
   },
   "license": "MIT",
   "type": "module",
@@ -19,7 +19,7 @@
     "workflow:start": "node dist/workflow/index.js",
     "dev": "concurrently -k -n server,vite -c blue,green \"tsx watch server/index.ts\" \"vite\"",
     "dev:workflow": "tsx watch workflow/index.ts",
-    "test": "tsx --test frontend/src/modules/workflow-timeline/build.test.ts frontend/src/modules/workflow-timeline/format.test.ts frontend/src/lib/phase.test.ts frontend/src/lib/composer.test.ts"
+    "test": "tsx --test frontend/src/modules/workflow-timeline/build.test.ts frontend/src/modules/workflow-timeline/format.test.ts frontend/src/lib/phase.test.ts frontend/src/lib/composer.test.ts server/lib/together-models.test.ts"
   },
   "engines": {
     "node": ">=20"

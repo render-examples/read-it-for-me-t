@@ -25,6 +25,7 @@ export type DigestSummary = {
 export type DigestResult = {
   runId: number;
   focus: string;
+  model: string;
   items: ItemAnalysis[];
   summary: DigestSummary;
 };

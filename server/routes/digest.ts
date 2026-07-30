@@ -8,6 +8,10 @@ import type { DigestItemInput } from "../../shared/types.js";
 import { dbReady } from "../lib/db.js";
 import { runDigest } from "../lib/orchestrator.js";
 import { streamSse } from "../lib/sse.js";
+import {
+  defaultTogetherModel,
+  isPlausibleModelId,
+} from "../lib/together-models.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.join(__dirname, "..", "..", ".uploads");
@@ -30,9 +34,14 @@ digestRouter.post("/digest", upload.array("pdfs", 5), async (req, res) => {
     return;
   }
 
-  const focus = typeof req.body.focus === "string" ? req.body.focus.slice(0, 500) : "";
   const urls = parseLines(req.body.urls);
   const textBlocks = parseLines(req.body.text);
+  const rawModel =
+    typeof req.body.model === "string" ? req.body.model.trim() : "";
+  const model =
+    rawModel && isPlausibleModelId(rawModel)
+      ? rawModel
+      : defaultTogetherModel();
 
   const items: DigestItemInput[] = [
     ...urls.map((value) => ({ kind: "url" as const, value })),
@@ -55,7 +64,7 @@ digestRouter.post("/digest", upload.array("pdfs", 5), async (req, res) => {
     return;
   }
 
-  await streamSse(res, runDigest(items, focus));
+  await streamSse(res, runDigest(items, model));
 });
 
 function parseLines(raw: unknown): string[] {

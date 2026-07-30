@@ -15,11 +15,19 @@ services:
         description: Required to trigger Render Workflow tasks
         required: true
         sync: false
+      - key: TOGETHER_API_KEY
+        displayName: Together AI API Key
+        description: Used to list chat models for the searchable picker
+        required: true
+        sync: false
+      - key: TOGETHER_MODEL
+        value: meta-llama/Llama-3.3-70B-Instruct-Turbo
+        description: Default chat model when the picker has no selection
       - key: WORKFLOW_SLUG
         value: read-it-for-me-workflow
         description: Slug of the linked Workflow service
       - key: GITHUB_REPO_URL
-        value: https://github.com/ojusave/read-it-for-me
+        value: https://github.com/render-examples/read-it-for-me-t
       - key: DATABASE_URL
         fromDatabase:
           name: read-it-for-me-db

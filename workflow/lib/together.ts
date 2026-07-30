@@ -2,7 +2,8 @@
 import Together from "together-ai";
 import { z } from "zod";
 
-const model = process.env.TOGETHER_MODEL || "meta-llama/Llama-3.3-70B-Instruct-Turbo";
+const DEFAULT_MODEL =
+  process.env.TOGETHER_MODEL || "meta-llama/Llama-3.3-70B-Instruct-Turbo";
 const MAX_ATTEMPTS = 3;
 
 let client: Together | null = null;
@@ -33,13 +34,20 @@ function isRetryableTogetherError(err: unknown): boolean {
   );
 }
 
-export async function chatJson<T>(system: string, user: string, schema: z.ZodType<T>): Promise<T> {
+/** Chat completion with JSON object response, validated by Zod. */
+export async function chatJson<T>(
+  system: string,
+  user: string,
+  schema: z.ZodType<T>,
+  model: string = DEFAULT_MODEL
+): Promise<T> {
   let lastError: unknown;
+  const resolvedModel = model.trim() || DEFAULT_MODEL;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       const response = await getClient().chat.completions.create({
-        model,
+        model: resolvedModel,
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },

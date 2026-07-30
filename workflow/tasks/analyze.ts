@@ -12,10 +12,17 @@ const analysisSchema = z.object({
   worthReason: z.string(),
 });
 
-const SYSTEM = `You analyze one reading item for a personal daily digest.
-Return JSON only with keys: title, whatChanged, whyCare, whatToDo, worthReading, worthReason.
+const SYSTEM = `You write one digest card for a busy reader who acts on the first line they see.
+Return JSON only: title, whatChanged, whyCare, whatToDo, worthReading, worthReason.
 worthReading must be "read", "skim", or "skip".
-Be specific and practical. No hype.`;
+
+Rules:
+- whatToDo: lead with a concrete verb. If more than one step, number them "1. …\\n2. …". Max 3 steps. No preamble.
+- whyCare: one short sentence. Why it matters now.
+- whatChanged: one short sentence. Use "First time seeing this" when there is no prior.
+- worthReason: one short sentence explaining the verdict.
+- title: short and scannable.
+- No filler ("In this article…", "It is important…", "Overall…"). No hype.`;
 
 /** Analyze one item with Together AI (four digest questions). */
 export const analyzeItem = task(
@@ -29,33 +36,25 @@ export const analyzeItem = task(
     title: string,
     sourceLabel: string,
     text: string,
-    focus: string,
     priorSummary: ItemAnalysis | null,
-    contentChanged: boolean
+    contentChanged: boolean,
+    model: string
   ): Promise<ItemAnalysis> {
     const priorBlock = priorSummary
       ? `\nPrior digest for this source:\n${JSON.stringify(priorSummary, null, 2)}\nContent changed since last run: ${contentChanged}`
       : "\nNo prior digest for this source.";
 
-    const focusBlock = focus.trim()
-      ? `\nUser focus this week: ${focus.trim()}`
-      : "";
-
     const user = `Title: ${title}
 Source: ${sourceLabel}
-${focusBlock}
 ${priorBlock}
 
 Content:
 ${excerpt(text, 8000)}
 
-Answer:
-1) What changed? (say "First time seeing this" if no prior)
-2) Why should I care?
-3) What should I do with this?
-4) Is this worth reading fully? (read / skim / skip + brief reason)`;
+Fill the JSON fields. Prioritize whatToDo (action first), then whyCare, whatChanged, verdict.
+If whatToDo has multiple steps, number them. Keep every field short.`;
 
-    const parsed = await chatJson(SYSTEM, user, analysisSchema);
+    const parsed = await chatJson(SYSTEM, user, analysisSchema, model);
 
     return {
       title: parsed.title || title,

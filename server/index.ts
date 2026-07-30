@@ -7,6 +7,8 @@ import { deployToRenderUrl, renderSignupUrlWithUtms } from "../shared/renderUrls
 import { initDb } from "./lib/db.js";
 import { digestRouter } from "./routes/digest.js";
 import { healthRouter } from "./routes/health.js";
+import { modelsRouter } from "./routes/models.js";
+import { defaultTogetherModel } from "./lib/together-models.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** Works for both `tsx server/index.ts` and `node dist/server/index.js`. */
@@ -15,12 +17,13 @@ const repoRoot = fs.existsSync(path.join(__dirname, "..", "package.json"))
   : path.join(__dirname, "..", "..");
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const GITHUB_REPO =
-  process.env.GITHUB_REPO_URL || "https://github.com/ojusave/read-it-for-me";
+  process.env.GITHUB_REPO_URL || "https://github.com/render-examples/read-it-for-me-t";
 
 const app = express();
 app.use(express.json({ limit: "512kb" }));
 
 app.use(healthRouter);
+app.use("/api", modelsRouter);
 app.use("/api", digestRouter);
 
 app.get("/api/config", (_req, res) => {
@@ -29,6 +32,7 @@ app.get("/api/config", (_req, res) => {
     deployUrl: deployToRenderUrl(GITHUB_REPO),
     signupNavbar: renderSignupUrlWithUtms("navbar_button"),
     workflowTimeline: process.env.ENABLE_WORKFLOW_TIMELINE !== "0",
+    defaultModel: defaultTogetherModel(),
   });
 });
 
