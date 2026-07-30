@@ -142,8 +142,16 @@
 .workflow-row__meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.4rem;
   margin-top: 0.2rem;
+}
+
+.workflow-row__duration {
+  font-family: "PP Neue Montreal Mono", ui-monospace, monospace;
+  font-size: 0.62rem;
+  color: var(--wt-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .workflow-badge {
@@ -236,16 +244,47 @@
 
 @media (max-width: 48em) {
   .workflow-timeline {
-    --execution-label-w: 7.5rem;
+    --execution-label-w: 100%;
+  }
+
+  .workflow-timeline__head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .workflow-timeline__elapsed {
+    align-self: flex-start;
+  }
+
+  .workflow-timeline__axis {
+    display: none;
   }
 
   .workflow-timeline__chart {
-    overflow-x: auto;
+    overflow-x: visible;
   }
 
-  .workflow-timeline__axis,
   .workflow-row {
-    min-width: 32rem;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+    min-width: 0;
+    padding: 0.65rem 0;
+    min-height: 0;
+  }
+
+  .workflow-row__label {
+    padding: 0;
+  }
+
+  .workflow-row__name {
+    white-space: normal;
+  }
+
+  .workflow-row__track {
+    width: 100%;
+    min-height: 1.45rem;
   }
 }
 

@@ -1,6 +1,7 @@
 <script lang="ts">
-  /** Single digest item card with read/skim/skip badge and source link. */
+  /** Single digest item card with human-readable verdict. */
   import type { ItemAnalysis } from "../lib/api";
+  import { COPY, verdictLabel } from "../lib/copy";
   import { isHttpUrl, urlHostname } from "../lib/urls";
 
   let { card }: { card: ItemAnalysis } = $props();
@@ -9,19 +10,13 @@
   const sourceDisplay = $derived(
     sourceUrl ? urlHostname(sourceUrl) : card.sourceLabel
   );
-
-  const badgeClass = $derived(
-    card.worthReading === "read"
-      ? "badge badge-read"
-      : card.worthReading === "skim"
-        ? "badge badge-skim"
-        : "badge badge-skip"
-  );
+  const verdict = $derived(verdictLabel(card.worthReading));
+  const badgeClass = $derived(`badge badge-${card.worthReading}`);
 </script>
 
 <article class="card">
-  <span class={badgeClass}>{card.worthReading}</span>
-  <h3>
+  <span class={badgeClass} aria-label={verdict}>{verdict}</span>
+  <h3 class="card-title">
     {#if sourceUrl}
       <a class="card-link" href={sourceUrl} target="_blank" rel="noopener noreferrer">
         {card.title}
@@ -39,21 +34,21 @@
       {card.sourceLabel}
     {/if}
   </p>
-  <dl>
+  <dl class="card-fields">
     <div>
-      <dt>What changed?</dt>
+      <dt>{COPY.results.whatChanged}</dt>
       <dd>{card.whatChanged}</dd>
     </div>
     <div>
-      <dt>Why care?</dt>
+      <dt>{COPY.results.whyCare}</dt>
       <dd>{card.whyCare}</dd>
     </div>
     <div>
-      <dt>What to do</dt>
+      <dt>{COPY.results.whatToDo}</dt>
       <dd>{card.whatToDo}</dd>
     </div>
     <div>
-      <dt>Worth reading?</dt>
+      <dt>{COPY.results.verdictReason}</dt>
       <dd>{card.worthReason}</dd>
     </div>
   </dl>

@@ -1,5 +1,6 @@
 /** Express entry: serves the Svelte SPA, config API, health check, and digest routes. */
 import path from "node:path";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { deployToRenderUrl, renderSignupUrlWithUtms } from "../shared/renderUrls.js";
@@ -8,7 +9,10 @@ import { digestRouter } from "./routes/digest.js";
 import { healthRouter } from "./routes/health.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.join(__dirname, "..", "..");
+/** Works for both `tsx server/index.ts` and `node dist/server/index.js`. */
+const repoRoot = fs.existsSync(path.join(__dirname, "..", "package.json"))
+  ? path.join(__dirname, "..")
+  : path.join(__dirname, "..", "..");
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const GITHUB_REPO =
   process.env.GITHUB_REPO_URL || "https://github.com/ojusave/read-it-for-me";

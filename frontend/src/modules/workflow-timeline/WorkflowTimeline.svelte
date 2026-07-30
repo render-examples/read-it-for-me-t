@@ -1,6 +1,7 @@
 <script lang="ts">
   /** Live Gantt of Render Workflow stages for the current digest run. */
   import { onDestroy } from "svelte";
+  import { COPY } from "../../lib/copy";
   import { buildWorkflowTimeline } from "./build";
   import { formatDuration, spanPosition, STAGE_LABEL } from "./format";
   import type { StageEvent } from "./types";
@@ -9,7 +10,7 @@
   let {
     events,
     active,
-    headline = "Execution timeline",
+    headline = COPY.timeline.title,
   }: {
     events: StageEvent[];
     active: boolean;
@@ -36,23 +37,25 @@
     if (timer) clearInterval(timer);
   });
 
-  const timeline = $derived(
-    buildWorkflowTimeline({ events, nowMs, active })
-  );
-
+  const timeline = $derived(buildWorkflowTimeline({ events, nowMs, active }));
   const stages = ["fetch", "analyze", "synthesize"] as const;
+
+  function rowDurationMs(row: (typeof timeline.rows)[number]): number {
+    if (!row.spans.length) return 0;
+    const start = Math.min(...row.spans.map((s) => s.startMs));
+    const end = Math.max(...row.spans.map((s) => s.endMs));
+    return Math.max(0, end - start);
+  }
 </script>
 
 <section class="workflow-timeline" aria-live="polite">
   <div class="workflow-timeline__head">
     <div>
       <h2 class="workflow-timeline__title">{headline}</h2>
-      <p class="workflow-timeline__hint">
-        Clock time across Workflow tasks. Hover a stage for duration.
-      </p>
+      <p class="workflow-timeline__hint">{COPY.timeline.hint}</p>
     </div>
     <span class="workflow-timeline__elapsed">
-      {active ? "LIVE · " : ""}{formatDuration(timeline.durationMs)}
+      {active ? `${COPY.timeline.live} · ` : ""}{formatDuration(timeline.durationMs)}
     </span>
   </div>
 
@@ -77,6 +80,7 @@
     </div>
 
     {#each timeline.rows as row (row.rowId)}
+      {@const duration = rowDurationMs(row)}
       <div class="workflow-row">
         <div class="workflow-row__label">
           <p class="workflow-row__name" title={row.label}>{row.label}</p>
@@ -87,12 +91,15 @@
             >
               {row.status}
             </span>
+            {#if duration > 0}
+              <span class="workflow-row__duration">{formatDuration(duration)}</span>
+            {/if}
           </div>
         </div>
         <div
           class="workflow-row__track"
           role="img"
-          aria-label={`${row.label}: ${row.status}`}
+          aria-label={`${row.label}: ${row.status}${duration ? `, ${formatDuration(duration)}` : ""}`}
         >
           {#each [0, 25, 50, 75, 100] as tick}
             <span
@@ -118,7 +125,7 @@
     {/each}
 
     {#if timeline.rows.length === 0}
-      <p class="workflow-timeline__empty">Waiting for Workflow tasks…</p>
+      <p class="workflow-timeline__empty">{COPY.timeline.waiting}</p>
     {/if}
   </div>
 </section>

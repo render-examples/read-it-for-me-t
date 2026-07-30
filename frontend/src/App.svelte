@@ -1,5 +1,5 @@
 <script lang="ts">
-  /** Main page: composer, live workflow timeline, digest cards, and summary. */
+  /** Composition root: digest phases, composer, workflow feedback, results. */
   import type {
     AppConfig,
     DigestResult,
@@ -9,23 +9,38 @@
     SseStagePayload,
   } from "./lib/api";
   import { loadConfig, runDigestStream } from "./lib/api";
+  import {
+    COPY,
+    type StarterCollection,
+    type Suggestion,
+  } from "./lib/copy";
+  import { deriveDigestPhase } from "./lib/phase";
+  import { splitComposerInput, validateComposerInput } from "./lib/composer";
   import ActivityPanel from "./components/ActivityPanel.svelte";
+  import AlertBanner from "./components/AlertBanner.svelte";
   import DigestCard from "./components/DigestCard.svelte";
+  import DigestComposer from "./components/DigestComposer.svelte";
   import DigestSummary from "./components/DigestSummary.svelte";
-  import Header from "./components/Header.svelte";
+  import EmptyState from "./components/EmptyState.svelte";
   import Footer from "./components/Footer.svelte";
+  import Header from "./components/Header.svelte";
+  import ResultsHeader from "./components/ResultsHeader.svelte";
+  import StarterGallery from "./components/StarterGallery.svelte";
+  import TopicStarters from "./components/TopicStarters.svelte";
   import {
     WorkflowTimeline,
     type StageEvent,
   } from "./modules/workflow-timeline";
 
   let config = $state<AppConfig | null>(null);
+  let configLoaded = $state(false);
   let input = $state("");
   let focus = $state("");
-  let files = $state<FileList | null>(null);
+  let pdfs = $state<File[]>([]);
   let running = $state(false);
   let status = $state("");
   let error = $state("");
+  let validationError = $state("");
   let activities = $state<SseActivityPayload[]>([]);
   let progress = $state<SseProgressPayload | null>(null);
   let stageEvents = $state<StageEvent[]>([]);
@@ -33,58 +48,51 @@
   let cards = $state<ItemAnalysis[]>([]);
   let result = $state<DigestResult | null>(null);
 
-  const suggestions = [
-    {
-      title: "Summarize Render docs",
-      subtitle: "paste a docs URL and see what changed",
-      value: "https://render.com/docs/workflows",
-    },
-    {
-      title: "Track product updates",
-      subtitle: "drop in release notes or blog posts",
-      value: "https://render.com/blog",
-    },
-    {
-      title: "Weekly reading digest",
-      subtitle: "paste notes and links from your queue",
-      value: "https://www.together.ai/demos\nNotes from standup: shipped workflows beta",
-    },
-    {
-      title: "Focus on AI infra",
-      subtitle: "filter everything through one lens",
-      value: "https://docs.together.ai/",
-      focus: "AI infra and inference",
-    },
-  ];
+  const phase = $derived(
+    deriveDigestPhase({
+      running,
+      hasCards: cards.length > 0,
+      hasResult: result !== null,
+      hasError: Boolean(error),
+      configLoaded,
+    })
+  );
 
-  const hasResults = $derived(cards.length > 0 || result !== null);
-  const showEmptyState = $derived(!hasResults && !running);
+  const showEmptyState = $derived(phase === "empty");
   const showTimeline = $derived(
     Boolean(config?.workflowTimeline) && (running || stageEvents.length > 0)
   );
   const showActivityFallback = $derived(
     !config?.workflowTimeline && (running || activities.length > 0)
   );
+  const showResultsChrome = $derived(
+    cards.length > 0 || result !== null || phase === "partial"
+  );
+  const timelineHeadline = $derived(
+    status ||
+      (progress?.message ?? COPY.timeline.title)
+  );
 
   $effect(() => {
     loadConfig()
-      .then((c) => (config = c))
-      .catch(() => (error = "Could not load app config"));
+      .then((c) => {
+        config = c;
+        configLoaded = true;
+      })
+      .catch(() => {
+        error = COPY.errors.config;
+        configLoaded = false;
+      });
   });
 
-  function applySuggestion(s: (typeof suggestions)[number]) {
+  function applySuggestion(s: Suggestion | StarterCollection) {
     input = s.value;
-    if (s.focus) focus = s.focus;
-  }
-
-  function splitInput(raw: string): { urls: string; text: string } {
-    const lines = raw
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-    const urlLines = lines.filter((line) => /^https?:\/\//i.test(line));
-    const textLines = lines.filter((line) => !/^https?:\/\//i.test(line));
-    return { urls: urlLines.join("\n"), text: textLines.join("\n") };
+    focus = s.focus;
+    validationError = "";
+    error = "";
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLTextAreaElement>("#digest-input")?.focus();
+    });
   }
 
   function appendStage(payload: SseStagePayload) {
@@ -105,15 +113,33 @@
     ];
   }
 
+  function resetRunState() {
+    error = "";
+    validationError = "";
+    cards = [];
+    result = null;
+    activities = [];
+    progress = null;
+    stageEvents = [];
+    stageSeq = 0;
+    status = "";
+  }
+
+  function newDigest() {
+    resetRunState();
+    running = false;
+  }
+
   async function submit() {
     if (!config || running) return;
-    const trimmed = input.trim();
-    if (!trimmed && !files?.length) {
-      error = "Add at least one URL, text line, or PDF";
+    const invalid = validateComposerInput(input, pdfs.length);
+    if (invalid) {
+      validationError = invalid;
       return;
     }
 
     running = true;
+    validationError = "";
     error = "";
     cards = [];
     result = null;
@@ -121,16 +147,14 @@
     progress = null;
     stageEvents = [];
     stageSeq = 0;
-    status = "Starting digest...";
+    status = "Starting digest…";
 
-    const { urls, text } = splitInput(input);
+    const { urls, text } = splitComposerInput(input);
     const form = new FormData();
     form.set("urls", urls);
     form.set("text", text);
     form.set("focus", focus);
-    if (files) {
-      for (const file of files) form.append("pdfs", file);
-    }
+    for (const file of pdfs) form.append("pdfs", file);
 
     await runDigestStream(form, {
       onStatus: (p) => {
@@ -153,7 +177,10 @@
         running = false;
       },
       onError: (p) => {
-        error = p.message;
+        error =
+          cards.length > 0
+            ? COPY.errors.partial(cards.length)
+            : p.message || COPY.errors.run;
         progress = null;
         running = false;
       },
@@ -162,116 +189,112 @@
     if (running) running = false;
   }
 
-  function onKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      submit();
-    }
+  function reloadPage() {
+    window.location.reload();
   }
 </script>
 
-<div class="page">
+<div class="page" data-phase={phase}>
   {#if config}
     <Header deployUrl={config.deployUrl} signupUrl={config.signupNavbar} />
 
     <main class="main">
       <div class="content">
         {#if showEmptyState}
-          <section class="intro">
-            <p class="intro-icons" aria-hidden="true">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5M13.5 6L18 10.5M13.5 6V10.5H18" />
-              </svg>
-              <span>+</span>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09-3.09z" />
-              </svg>
-            </p>
-            <p>
-              Drop in links, pasted text, or PDFs. Each item answers what changed, why it
-              matters, what to do, and whether it is worth reading fully. Powered by
-              <a href="https://www.together.ai/" target="_blank" rel="noopener noreferrer">Together AI</a>
-              on Render Workflows.
-            </p>
-          </section>
+          <EmptyState />
+          <DigestComposer
+            bind:input
+            bind:focus
+            bind:pdfs
+            {running}
+            {validationError}
+            prominent
+            onSubmit={submit}
+          />
+          <TopicStarters onSelect={applySuggestion} />
+          <StarterGallery onSelect={applySuggestion} />
         {/if}
 
         {#if showTimeline}
-          <WorkflowTimeline events={stageEvents} active={running} headline={status || "Execution timeline"} />
+          <WorkflowTimeline
+            events={stageEvents}
+            active={running}
+            headline={timelineHeadline}
+          />
         {:else if showActivityFallback}
           <ActivityPanel {activities} {progress} headline={status} />
         {/if}
 
-        {#if cards.length}
-          <div class="cards">
-            {#each cards as card}
-              <DigestCard {card} />
-            {/each}
-          </div>
+        {#if running && progress}
+          <p class="run-progress" role="status" aria-live="polite">
+            {progress.message}
+            {#if cards.length}
+              · {COPY.results.itemsStreaming(cards.length)}
+            {/if}
+          </p>
+        {/if}
+
+        {#if error}
+          <AlertBanner
+            message={error}
+            tone="error"
+            primaryLabel={COPY.app.retry}
+            onPrimary={submit}
+            secondaryLabel={phase === "error" && cards.length === 0
+              ? COPY.app.reload
+              : COPY.app.newDigest}
+            onSecondary={phase === "error" && cards.length === 0
+              ? reloadPage
+              : newDigest}
+          />
+        {/if}
+
+        {#if showResultsChrome}
+          <ResultsHeader
+            count={cards.length}
+            streaming={running}
+            onNewDigest={newDigest}
+          />
         {/if}
 
         {#if result}
           <DigestSummary {result} />
         {/if}
 
-        {#if showEmptyState}
-          <div class="suggestions">
-            {#each suggestions as s}
-              <button type="button" class="suggestion" onclick={() => applySuggestion(s)}>
-                <span class="suggestion-title">{s.title}</span>
-                <span class="suggestion-sub">{s.subtitle}</span>
-              </button>
+        {#if cards.length}
+          <div class="cards" aria-label="Digest items">
+            {#each cards as card, i (i)}
+              <DigestCard {card} />
             {/each}
           </div>
         {/if}
-
-        {#if error}
-          <p class="error">{error}</p>
-        {/if}
       </div>
 
-      <form
-        class="composer"
-        onsubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-      >
-        <fieldset class="composer-field">
-          <textarea
-            rows="4"
-            bind:value={input}
-            onkeydown={onKeydown}
-            placeholder="Paste URLs or text (one per line)..."
-            disabled={running}
-          ></textarea>
-          <button type="submit" class="send-btn" disabled={running} aria-label="Build digest">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-.528 60.516 60.516 0 00-18.445-8.986z" />
-            </svg>
-          </button>
-        </fieldset>
-
-        <div class="composer-meta">
-          <input
-            type="text"
-            class="focus-input"
-            bind:value={focus}
-            placeholder="Focus this week (optional)"
-            disabled={running}
-          />
-          <label class="file-label">
-            <input type="file" accept=".pdf" multiple bind:files disabled={running} />
-            Attach PDF
-          </label>
-        </div>
-      </form>
+      {#if !showEmptyState}
+        <DigestComposer
+          bind:input
+          bind:focus
+          bind:pdfs
+          {running}
+          {validationError}
+          onSubmit={submit}
+        />
+      {/if}
     </main>
 
     <Footer githubRepo={config.githubRepo} />
   {:else if error}
-    <main class="main"><p class="error">{error}</p></main>
+    <main class="main main-centered">
+      <AlertBanner
+        message={error}
+        tone="error"
+        primaryLabel={COPY.app.reload}
+        onPrimary={reloadPage}
+      />
+    </main>
   {:else}
-    <main class="main"><p class="status">Loading…</p></main>
+    <main class="main main-centered">
+      <p class="status" role="status">{COPY.app.loading}</p>
+    </main>
   {/if}
 </div>
