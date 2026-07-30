@@ -14,8 +14,6 @@ export type AppConfig = {
   githubRepo: string;
   deployUrl: string;
   signupNavbar: string;
-  signupHero: string;
-  signupFooter: string;
 };
 
 export async function loadConfig(): Promise<AppConfig> {

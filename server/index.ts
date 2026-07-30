@@ -16,7 +16,6 @@ const GITHUB_REPO =
 const app = express();
 app.use(express.json({ limit: "512kb" }));
 
-app.use("/dds", express.static(path.join(repoRoot, "node_modules", "render-dds", "dist")));
 app.use(healthRouter);
 app.use("/api", digestRouter);
 
@@ -25,8 +24,6 @@ app.get("/api/config", (_req, res) => {
     githubRepo: GITHUB_REPO,
     deployUrl: deployToRenderUrl(GITHUB_REPO),
     signupNavbar: renderSignupUrlWithUtms("navbar_button"),
-    signupHero: renderSignupUrlWithUtms("hero_cta"),
-    signupFooter: renderSignupUrlWithUtms("footer_link"),
   });
 });
 

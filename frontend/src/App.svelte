@@ -132,7 +132,7 @@
 
 <div class="page">
   {#if config}
-    <Header deployUrl={config.deployUrl} githubRepo={config.githubRepo} />
+    <Header deployUrl={config.deployUrl} signupUrl={config.signupNavbar} />
 
     <main class="main">
       <div class="content">
@@ -226,7 +226,7 @@
       </form>
     </main>
 
-    <Footer signupUrl={config.signupFooter} githubRepo={config.githubRepo} />
+    <Footer githubRepo={config.githubRepo} />
   {:else if error}
     <main class="main"><p class="error">{error}</p></main>
   {:else}
