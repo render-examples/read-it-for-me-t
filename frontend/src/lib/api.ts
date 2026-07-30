@@ -33,6 +33,7 @@ export type ModelsResponse = {
   source: "together" | "fallback";
 };
 
+/** Load chrome URLs and feature flags from the web service. */
 export async function loadConfig(): Promise<AppConfig> {
   const res = await fetch("/api/config");
   if (!res.ok) throw new Error("Failed to load config");
@@ -84,6 +85,7 @@ export async function runDigestStream(
   }
 }
 
+/** Parse complete SSE frames from the stream buffer; return the incomplete tail. */
 function consumeSse(buffer: string, handlers: DigestStreamHandlers): string {
   const parts = buffer.split("\n\n");
   const rest = parts.pop() ?? "";

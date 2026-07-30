@@ -4,7 +4,11 @@ import { excerpt } from "../lib/together.js";
 
 const FETCH_TIMEOUT_MS = 60_000;
 
-/** Fetch or decode content for one digest item. */
+/**
+ * Workflow task: load one digest source.
+ * URL → HTML strip; text → passthrough; PDF → MVP placeholder (no extraction yet).
+ * Throws on HTTP errors so Render retries the run.
+ */
 export const fetchItem = task(
   {
     name: "fetch_item",
@@ -57,11 +61,13 @@ export const fetchItem = task(
   }
 );
 
+/** Pull <title> from HTML when present. */
 function extractTitle(html: string): string | null {
   const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
   return match?.[1]?.trim() ?? null;
 }
 
+/** Naive HTML → text for LLM context (scripts/styles removed). */
 function stripHtml(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")

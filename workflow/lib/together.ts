@@ -34,7 +34,10 @@ function isRetryableTogetherError(err: unknown): boolean {
   );
 }
 
-/** Chat completion with JSON object response, validated by Zod. */
+/**
+ * Chat completion with JSON object response, validated by Zod.
+ * Retries transient Render/network stream errors; uses the caller’s model or TOGETHER_MODEL.
+ */
 export async function chatJson<T>(
   system: string,
   user: string,
@@ -75,6 +78,7 @@ export async function chatJson<T>(
   throw lastError instanceof Error ? lastError : new Error("Together AI request failed");
 }
 
+/** Truncate long source text before sending it to the model. */
 export function excerpt(text: string, max = 12000): string {
   if (text.length <= max) return text;
   return `${text.slice(0, max)}\n\n[truncated]`;

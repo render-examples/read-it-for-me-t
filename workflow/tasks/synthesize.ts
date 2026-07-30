@@ -19,7 +19,10 @@ Rules:
 - Reference item titles only when they help the reader act.
 - No preamble, no recap, no hype.`;
 
-/** Synthesize the overall digest summary from per-item analyses. */
+/**
+ * Workflow task: Together chat → digest headline + doToday / readNow / skip lists.
+ * Cap lists at 5 after the model returns.
+ */
 export const synthesizeDigest = task(
   {
     name: "synthesize_digest",

@@ -1,3 +1,7 @@
+/**
+ * Vite build for the Svelte SPA.
+ * Dev server proxies /api and /health to the Express web service.
+ */
 import path from "node:path";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vite";

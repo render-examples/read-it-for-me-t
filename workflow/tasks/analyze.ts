@@ -24,7 +24,10 @@ Rules:
 - title: short and scannable.
 - No filler ("In this article…", "It is important…", "Overall…"). No hype.`;
 
-/** Analyze one item with Together AI (four digest questions). */
+/**
+ * Workflow task: Together chat → one action-first digest card.
+ * `model` is chosen in the UI and passed through from the web orchestrator.
+ */
 export const analyzeItem = task(
   {
     name: "analyze_item",

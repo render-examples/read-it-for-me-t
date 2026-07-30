@@ -24,6 +24,10 @@ const upload = multer({
 
 export const digestRouter = Router();
 
+/**
+ * Accept URLs, text, optional model id, and PDFs; stream digest progress as SSE.
+ * Requires RENDER_API_KEY and DATABASE_URL.
+ */
 digestRouter.post("/digest", upload.array("pdfs", 5), async (req, res) => {
   if (!process.env.RENDER_API_KEY?.trim()) {
     res.status(503).json({ error: "RENDER_API_KEY is not configured" });

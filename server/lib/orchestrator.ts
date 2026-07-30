@@ -98,6 +98,10 @@ function taskStatusLabel(status: string): string {
   }
 }
 
+/**
+ * Start one Workflow task, poll until terminal, and yield SSE chunks for the UI.
+ * Throws after emitting a failed stage event so the digest can stop cleanly.
+ */
 async function* runTask<T>(
   taskName: string,
   label: string,
@@ -175,6 +179,11 @@ async function* runTask<T>(
   }
 }
 
+/**
+ * Run fetch → analyze per item, then synthesize.
+ * Yields SSE events (`status`, `activity`, `progress`, `stage`, `card`, `done`).
+ * Inference stays in Workflow tasks; this process only orchestrates and persists.
+ */
 export async function* runDigest(
   items: DigestItemInput[],
   model: string

@@ -12,6 +12,7 @@ const pool = process.env.DATABASE_URL
     })
   : null;
 
+/** Create digest tables if they do not exist. No-op when DATABASE_URL is unset. */
 export async function initDb(): Promise<void> {
   if (!pool) {
     console.warn("DATABASE_URL not set — persistence disabled");
@@ -42,6 +43,7 @@ export async function initDb(): Promise<void> {
   `);
 }
 
+/** Insert a digest_runs row; returns 0 when persistence is disabled. */
 export async function createRun(focus: string): Promise<number> {
   if (!pool) return 0;
   const { rows } = await pool.query(
@@ -51,12 +53,12 @@ export async function createRun(focus: string): Promise<number> {
   return rows[0].id as number;
 }
 
+/** Prior analysis + content hash for change detection across digests. */
 export async function getPriorSnapshot(sourceKey: string): Promise<{
   title: string;
   contentHash: string;
   summary: ItemAnalysis;
 } | null> {
-  // Used by the orchestrator to tell Together AI what changed since the last digest.
   if (!pool) return null;
   const { rows } = await pool.query(
     `SELECT title, content_hash, summary FROM source_snapshots WHERE source_key = $1`,
@@ -71,6 +73,7 @@ export async function getPriorSnapshot(sourceKey: string): Promise<{
   };
 }
 
+/** Persist summary, per-item analyses, and upsert source snapshots. */
 export async function saveRun(
   runId: number,
   items: ItemAnalysis[],
@@ -106,6 +109,7 @@ export async function saveRun(
   }
 }
 
+/** True when DATABASE_URL is set and the pool was created. */
 export function dbReady(): boolean {
   return pool !== null;
 }

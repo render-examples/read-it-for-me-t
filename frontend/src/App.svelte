@@ -99,6 +99,7 @@
       });
   });
 
+  /** Prefill the composer from a topic chip or starter collection. */
   function applySuggestion(s: Suggestion | StarterCollection) {
     input = s.value;
     validationError = "";
@@ -108,6 +109,7 @@
     });
   }
 
+  /** Append one Workflow stage event for the live Gantt. */
   function appendStage(payload: SseStagePayload) {
     stageSeq += 1;
     stageEvents = [
@@ -126,6 +128,7 @@
     ];
   }
 
+  /** Clear results and timeline without changing composer input. */
   function resetRunState() {
     error = "";
     validationError = "";
@@ -143,6 +146,7 @@
     running = false;
   }
 
+  /** POST the composer payload and wire SSE handlers into UI state. */
   async function submit() {
     if (!config || running) return;
     const invalid = validateComposerInput(input, pdfs.length);

@@ -1,10 +1,12 @@
 /** Shared digest types used by server, workflow, and frontend. */
 
+/** One source the user submitted: URL, pasted text, or PDF bytes. */
 export type DigestItemInput =
   | { kind: "url"; value: string }
   | { kind: "text"; value: string }
   | { kind: "pdf"; filename: string; base64: string };
 
+/** Per-item Together analysis shown as a digest card. */
 export type ItemAnalysis = {
   title: string;
   sourceLabel: string;
@@ -15,6 +17,7 @@ export type ItemAnalysis = {
   worthReason: string;
 };
 
+/** Top-of-digest lists synthesized after all items finish. */
 export type DigestSummary = {
   headline: string;
   doToday: string[];
@@ -22,6 +25,7 @@ export type DigestSummary = {
   skip: string[];
 };
 
+/** Final `done` SSE payload after Postgres save. */
 export type DigestResult = {
   runId: number;
   focus: string;

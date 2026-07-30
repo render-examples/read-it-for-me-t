@@ -4,6 +4,7 @@ import { listChatModels } from "../lib/together-models.js";
 
 export const modelsRouter = Router();
 
+/** Cached Together chat catalog for the UI picker (`source: together | fallback`). */
 modelsRouter.get("/models", async (_req, res) => {
   try {
     const payload = await listChatModels();

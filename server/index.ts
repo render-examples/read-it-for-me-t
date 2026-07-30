@@ -27,6 +27,7 @@ app.use("/api", modelsRouter);
 app.use("/api", digestRouter);
 
 app.get("/api/config", (_req, res) => {
+  // Chrome URLs + feature flags for the SPA (no secrets).
   res.json({
     githubRepo: GITHUB_REPO,
     deployUrl: deployToRenderUrl(GITHUB_REPO),
