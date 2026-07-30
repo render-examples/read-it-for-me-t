@@ -1,19 +1,25 @@
 <script lang="ts">
-  /** Accessible digest composer: input, focus, PDFs, and submit. */
+  /** Accessible digest composer: input, model picker, PDFs, and submit. */
+  import type { TogetherChatModel } from "../lib/api";
   import { COPY } from "../lib/copy";
+  import ModelPicker from "./ModelPicker.svelte";
 
   let {
     input = $bindable(""),
-    focus = $bindable(""),
+    modelId = $bindable(""),
     pdfs = $bindable<File[]>([]),
+    models = [],
+    modelsLoading = false,
     running = false,
     validationError = "",
     prominent = false,
     onSubmit,
   }: {
     input?: string;
-    focus?: string;
+    modelId?: string;
     pdfs?: File[];
+    models?: TogetherChatModel[];
+    modelsLoading?: boolean;
     running?: boolean;
     validationError?: string;
     prominent?: boolean;
@@ -71,17 +77,12 @@
   </div>
 
   <div class="composer-row">
-    <div class="composer-focus">
-      <label class="field-label" for="digest-focus">{COPY.composer.focusLabel}</label>
-      <input
-        id="digest-focus"
-        type="text"
-        class="focus-input"
-        bind:value={focus}
-        placeholder={COPY.composer.focusPlaceholder}
-        disabled={running}
-      />
-    </div>
+    <ModelPicker
+      {models}
+      bind:modelId
+      disabled={running}
+      loading={modelsLoading}
+    />
 
     <div class="composer-pdfs">
       <span class="field-label" id="pdf-label">{COPY.composer.pdfsLabel}</span>

@@ -38,6 +38,12 @@
 <section class="summary" aria-labelledby="digest-summary-heading">
   <p class="summary-eyebrow">{COPY.results.summaryTitle}</p>
   <h2 id="digest-summary-heading">{result.summary.headline}</h2>
+  {#if result.model}
+    <p class="summary-model">
+      <span class="summary-model-label">{COPY.results.modelUsed}</span>
+      <code>{result.model}</code>
+    </p>
+  {/if}
 
   {#each sections as section}
     <div class="summary-section">

@@ -5,14 +5,19 @@ import { chatJson } from "../lib/together.js";
 
 const summarySchema = z.object({
   headline: z.string(),
-  doToday: z.array(z.string()),
-  readNow: z.array(z.string()),
-  skip: z.array(z.string()),
+  doToday: z.array(z.string()).max(5),
+  readNow: z.array(z.string()).max(5),
+  skip: z.array(z.string()).max(5),
 });
 
-const SYSTEM = `You write the top-of-digest summary for a personal reading queue.
-Return JSON only: headline, doToday (array), readNow (array), skip (array).
-Use short actionable strings. Reference item titles where helpful.`;
+const SYSTEM = `You write the top of a reading digest for someone catching up fast.
+Return JSON only: headline, doToday, readNow, skip (each array max 5 strings).
+
+Rules:
+- headline: one concrete next priority. Prefer a verb. Not a cute summary.
+- doToday / readNow / skip: short actionable lines. Start with verbs when possible. Prefer fewer items over fluff. Empty arrays are fine.
+- Reference item titles only when they help the reader act.
+- No preamble, no recap, no hype.`;
 
 /** Synthesize the overall digest summary from per-item analyses. */
 export const synthesizeDigest = task(
@@ -24,13 +29,18 @@ export const synthesizeDigest = task(
   },
   async function synthesizeDigest(
     items: ItemAnalysis[],
-    focus: string
+    model: string
   ): Promise<DigestSummary> {
-    const focusLine = focus.trim() ? `User focus: ${focus.trim()}\n` : "";
-    const user = `${focusLine}Items:\n${JSON.stringify(items, null, 2)}
+    const user = `Items:\n${JSON.stringify(items, null, 2)}
 
-Write a headline plus three lists: doToday, readNow, skip.`;
+Write headline + doToday + readNow + skip. Cap each list at 5. Lead with what to do.`;
 
-    return chatJson(SYSTEM, user, summarySchema);
+    const parsed = await chatJson(SYSTEM, user, summarySchema, model);
+    return {
+      headline: parsed.headline,
+      doToday: parsed.doToday.slice(0, 5),
+      readNow: parsed.readNow.slice(0, 5),
+      skip: parsed.skip.slice(0, 5),
+    };
   }
 );

@@ -17,11 +17,32 @@ export type AppConfig = {
   signupNavbar: string;
   /** When true, App shows the detachable WorkflowTimeline module. */
   workflowTimeline: boolean;
+  defaultModel: string;
+};
+
+export type TogetherChatModel = {
+  id: string;
+  displayName: string;
+  organization: string;
+  contextLength: number | null;
+};
+
+export type ModelsResponse = {
+  models: TogetherChatModel[];
+  defaultModel: string;
+  source: "together" | "fallback";
 };
 
 export async function loadConfig(): Promise<AppConfig> {
   const res = await fetch("/api/config");
   if (!res.ok) throw new Error("Failed to load config");
+  return res.json();
+}
+
+/** Load Together chat models for the searchable picker. */
+export async function loadModels(): Promise<ModelsResponse> {
+  const res = await fetch("/api/models");
+  if (!res.ok) throw new Error("Failed to load models");
   return res.json();
 }
 

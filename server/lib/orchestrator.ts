@@ -177,10 +177,10 @@ async function* runTask<T>(
 
 export async function* runDigest(
   items: DigestItemInput[],
-  focus: string
+  model: string
 ): AsyncGenerator<StreamChunk> {
   activitySeq = 0;
-  const runId = await createRun(focus);
+  const runId = await createRun("");
   const total = items.length;
   const analyses: ItemAnalysis[] = [];
   const sourceKeys: string[] = [];
@@ -191,6 +191,7 @@ export async function* runDigest(
     data: { phase: "start", message: `Processing ${total} item(s)...`, total },
   };
   yield activity(`Digest run #${runId} started`, "info");
+  yield activity(`Together model: ${model}`, "info");
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
@@ -262,9 +263,9 @@ export async function* runDigest(
         fetched.title,
         fetched.sourceLabel,
         fetched.text,
-        focus,
         prior?.summary ?? null,
         prior ? contentHash !== prior.contentHash : false,
+        model,
       ],
       { rowId, rowLabel, stage: "analyze" }
     );
@@ -291,7 +292,7 @@ export async function* runDigest(
   const synthRunner = runTask<DigestSummary>(
     "synthesize_digest",
     "Digest summary",
-    [analyses, focus],
+    [analyses, model],
     { rowId: "digest", rowLabel: "Digest", stage: "synthesize" }
   );
   let summary!: DigestSummary;
@@ -308,6 +309,12 @@ export async function* runDigest(
   await saveRun(runId, analyses, sourceKeys, contentHashes, summary);
   yield activity("Digest complete", "success");
 
-  const result: DigestResult = { runId, focus, items: analyses, summary };
+  const result: DigestResult = {
+    runId,
+    focus: "",
+    model,
+    items: analyses,
+    summary,
+  };
   yield { event: "done", data: result };
 }

@@ -2,12 +2,12 @@
 
 [![Read It For Me](static/images/screenshot.png)](https://read-it-for-me.onrender.com/)
 
-Personal daily digest for links, pasted text, and PDFs. Each item answers what changed, why it matters, what to do, and whether it is worth reading fully.
+Digest for links, pasted text, and PDFs. Each item answers what changed, why it matters, what to do, and whether it is worth reading fully.
 
-[Live demo](https://read-it-for-me.onrender.com/)
+[Live demo](https://read-it-for-me.onrender.com/) · [GitHub](https://github.com/render-examples/read-it-for-me-t)
 
 <p align="left">
-  <a href="https://render.com/deploy?repo=https://github.com/ojusave/read-it-for-me">
+  <a href="https://render.com/deploy?repo=https://github.com/render-examples/read-it-for-me-t">
     <img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render" height="28" />
   </a>
 </p>
@@ -31,29 +31,31 @@ Inference by [<img src="static/images/together-ai-logo.png" alt="" height="18" /
 
 ## Highlights
 
-- **Action-oriented cards**, not generic summaries: every item gets `whatChanged`, `whyCare`, `whatToDo`, and a `read` / `skim` / `skip` verdict.
-- **Live progress** over Server-Sent Events while workflow tasks run on Render, with a detachable Gantt-style execution timeline (fetch → analyze → synthesize).
+- **Action-first cards**: every item leads with `Do this`, then why it matters, what changed, and a `read` / `skim` / `skip` call. Summary lists cap at 5.
+- **Together model picker**: searchable dropdown of Together chat models (live from `/v1/models`), passed into Workflow analyze/synthesize tasks.
+- **Composer-first empty state**: topic chips and collection starters (news, ideas, science, culture) so a first run needs almost no typing.
+- **Live progress** over Server-Sent Events while workflow tasks run on Render, with a detachable left-to-right Gantt timeline (`fetch` → `analyze` → `synthesize`).
 - **Change tracking** via Postgres snapshots: repeat sources compare against the last digest.
-- **Separated layers**: Svelte UI, Express API, and workflow tasks live in distinct folders with shared types in `shared/`.
-- **Together AI stays in workflows**: the web service orchestrates tasks; it never calls the LLM directly.
 
 ## Overview
 
 Read It For Me is for people who skim newsletters, release notes, and long threads and want a structured digest instead of a paragraph of fluff.
 
-You submit URLs (one per line), pasted text blocks, optional PDFs, and an optional focus string (for example "AI infra" or "hiring"). The Express server starts Render Workflow tasks, polls until each completes, and streams status updates and per-item cards back to the browser. When all items are analyzed, a synthesis task produces a headline plus `doToday`, `readNow`, and `skip` lists.
+You submit URLs (one per line), pasted text blocks, optional PDFs, and a Together chat model from the searchable picker (default: `meta-llama/Llama-3.3-70B-Instruct-Turbo`). The Express server starts Render Workflow tasks, polls until each completes, and streams status, activity, stage timing, and per-item cards back to the browser. When all items are analyzed, a synthesis task produces a headline plus `doToday`, `readNow`, and `skip` lists.
 
-The workflow service uses Together AI (default: `meta-llama/Llama-3.3-70B-Instruct-Turbo`) inside `analyze_item` and `synthesize_digest`. Prior snapshots from Postgres feed into the analyze prompt so the model can comment on what changed since the last run.
+The web service lists Together chat models via `GET /api/models` (needs `TOGETHER_API_KEY`). Inference still runs only inside Workflow tasks (`analyze_item`, `synthesize_digest`) using the selected model. Prior snapshots from Postgres feed into the analyze prompt so the model can comment on what changed since the last run.
 
-**Current MVP gaps:** PDF uploads are accepted but text extraction is a placeholder. The workflow service is created manually in the Render Dashboard (not in `render.yaml`), matching the pattern used in other Render Workflows examples in this workspace.
+**Current MVP gaps:** PDF uploads are accepted but text extraction is a placeholder. The workflow service is created manually in the Render Dashboard (not in `render.yaml`), matching the pattern used in other Render Workflows examples.
 
 ## Architecture
 
 ![Architecture diagram](static/images/architecture-diagram.png)
 
+![Pipeline flow](static/images/pipeline-flow.png)
+
 | Layer | Folder | Role |
 |-------|--------|------|
-| UI | `frontend/` | Svelte 5 form, SSE client, digest cards |
+| UI | `frontend/` | Svelte 5 composer, SSE client, digest cards, detachable timeline |
 | API | `server/` | Express routes, orchestrator, Postgres, static SPA |
 | Tasks | `workflow/` | `fetch_item`, `analyze_item`, `synthesize_digest` |
 | Contracts | `shared/` | Types and Render URL helpers |
@@ -62,9 +64,11 @@ The workflow service uses Together AI (default: `meta-llama/Llama-3.3-70B-Instru
 
 ### Web UI
 
-1. Open the deployed app.
-2. Paste URLs, text, optional PDFs, and an optional focus.
-3. Click **Build digest**. Cards appear as each item finishes; the summary panel loads at the end.
+1. Open the [live demo](https://read-it-for-me.onrender.com/) (or your deploy).
+2. Pick a topic chip or collection, or paste URLs / text / PDFs.
+3. Optionally search and pick a Together AI chat model (defaults to Llama 3.3 70B).
+4. Click **Build digest**. Cards stream in as each item finishes; the summary panel loads at the end.
+5. Use **New digest** to clear results and start again. Detach the execution timeline when you want a larger Gantt view.
 
 ### API (SSE)
 
@@ -74,10 +78,12 @@ The workflow service uses Together AI (default: `meta-llama/Llama-3.3-70B-Instru
 |-------|------|-------|
 | `urls` | string | Newline-separated URLs (max 20 lines) |
 | `text` | string | Newline-separated text blocks |
-| `focus` | string | Optional theme, max 500 chars |
+| `model` | string | Optional Together chat model id (defaults to `TOGETHER_MODEL`) |
 | `pdfs` | file[] | Optional PDFs, max 5 files, 3 MB each |
 
-Response is `text/event-stream` with events: `status`, `card`, `done`, `error`.
+Also: `GET /api/models` returns `{ models, defaultModel, source }` for the picker.
+
+Response is `text/event-stream` with events: `status`, `activity`, `progress`, `stage`, `card`, `done`, `error`.
 
 Requires `RENDER_API_KEY` and `DATABASE_URL` on the web service. Returns `503` if either is missing.
 
@@ -88,10 +94,17 @@ curl https://read-it-for-me.onrender.com/health
 # {"ok":true}
 ```
 
+### Tests
+
+```bash
+npm test
+npm run build
+```
+
 ## Deploy on Render
 
 <p align="left">
-  <a href="https://render.com/deploy?repo=https://github.com/ojusave/read-it-for-me">
+  <a href="https://render.com/deploy?repo=https://github.com/render-examples/read-it-for-me-t">
     <img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render" height="28" />
   </a>
 </p>
@@ -100,7 +113,7 @@ Primary path: Blueprint for the web service and database, then a manual Workflow
 
 ### 1. Push to GitHub
 
-Connect this repository to GitHub if it is not already.
+This repo lives at [render-examples/read-it-for-me-t](https://github.com/render-examples/read-it-for-me-t). Fork or connect it if you are deploying your own copy.
 
 ### 2. Deploy the Blueprint
 
@@ -109,7 +122,7 @@ Use the **Deploy to Render** button in the app UI, or apply [`render.yaml`](rend
 - **Web service** `read-it-for-me` — `node dist/server/index.js`, health check `/health`
 - **Postgres** `read-it-for-me-db` — connection string wired to `DATABASE_URL`
 
-Set `RENDER_API_KEY` on the web service (Account Settings → API Keys).
+Set `RENDER_API_KEY` and `TOGETHER_API_KEY` on the web service (Account Settings → API Keys for Render; Together dashboard for the model key).
 
 ### 3. Create the Workflow service
 
@@ -137,9 +150,11 @@ The Blueprint does not include the workflow runner. In the Dashboard:
 | Variable | Required | Default | If missing |
 |----------|----------|---------|------------|
 | `RENDER_API_KEY` | Yes (for digest) | — | `/api/digest` returns 503; `/health` still works |
+| `TOGETHER_API_KEY` | Yes (for model list) | — | `/api/models` falls back to the default model only |
+| `TOGETHER_MODEL` | No | `meta-llama/Llama-3.3-70B-Instruct-Turbo` | Picker default / form default |
 | `DATABASE_URL` | Yes (for digest) | — | `/api/digest` returns 503; persistence disabled |
 | `WORKFLOW_SLUG` | No | `read-it-for-me-workflow` | Task paths won't match your workflow |
-| `GITHUB_REPO_URL` | No | `https://github.com/ojusave/read-it-for-me` | Deploy button points at default repo |
+| `GITHUB_REPO_URL` | No | `https://github.com/render-examples/read-it-for-me-t` | Deploy button points at default repo |
 | `POLL_INTERVAL_MS` | No | `3000` | Task poll interval |
 | `ENABLE_WORKFLOW_TIMELINE` | No | on (unset) | Set to `0` to hide the detachable Gantt and fall back to the activity log |
 | `PORT` | No | `3000` | Set by Render in production |
@@ -165,27 +180,31 @@ The Blueprint does not include the workflow runner. In the Dashboard:
 
 ```
 read-it-for-me/
-├── frontend/src/          # Svelte UI (components, api client)
+├── frontend/src/
+│   ├── App.svelte              # Phases, streaming, layout shell
+│   ├── components/             # Composer, cards, empty state, chrome
+│   ├── lib/                    # api, copy, phase, composer helpers
 │   └── modules/
 │       └── workflow-timeline/  # Detachable Gantt (delete folder + App import to remove)
 ├── server/
-│   ├── index.ts           # Express entry, static files, config route
-│   ├── routes/            # health, digest
-│   └── lib/               # db, orchestrator, sse
+│   ├── index.ts                # Express entry, static files, config route
+│   ├── routes/                 # health, digest
+│   └── lib/                    # db, orchestrator, sse
 ├── workflow/
-│   ├── index.ts           # Task registration
-│   ├── tasks/             # fetch, analyze, synthesize
-│   └── lib/together.ts   # Together AI adapter
-├── shared/                # types.ts, renderUrls.ts
-├── static/images/         # README architecture diagrams
-├── render.yaml            # Web + Postgres Blueprint
-└── vite.config.ts         # Builds frontend → dist/client
+│   ├── index.ts                # Task registration
+│   ├── tasks/                  # fetch, analyze, synthesize
+│   └── lib/together.ts         # Together AI adapter
+├── shared/                     # types.ts, renderUrls.ts
+├── static/images/              # README screenshots and diagrams
+├── render.yaml                 # Web + Postgres Blueprint
+└── vite.config.ts              # Builds frontend → dist/client
 ```
 
 **Where to change things**
 
 - Digest prompts and LLM JSON shape: `workflow/tasks/analyze.ts`, `workflow/tasks/synthesize.ts`
 - SSE event shape: `server/lib/orchestrator.ts`, `shared/types.ts`
+- UI copy and phases: `frontend/src/lib/copy.ts`, `frontend/src/lib/phase.ts`
 - UI layout and streaming client: `frontend/src/App.svelte`, `frontend/src/lib/api.ts`
 - Postgres schema: `server/lib/db.ts`
 

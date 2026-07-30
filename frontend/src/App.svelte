@@ -1,5 +1,6 @@
 <script lang="ts">
   /** Composition root: digest phases, composer, workflow feedback, results. */
+  import { loadConfig, loadModels, runDigestStream } from "./lib/api";
   import type {
     AppConfig,
     DigestResult,
@@ -7,8 +8,8 @@
     SseActivityPayload,
     SseProgressPayload,
     SseStagePayload,
+    TogetherChatModel,
   } from "./lib/api";
-  import { loadConfig, runDigestStream } from "./lib/api";
   import {
     COPY,
     type StarterCollection,
@@ -35,7 +36,9 @@
   let config = $state<AppConfig | null>(null);
   let configLoaded = $state(false);
   let input = $state("");
-  let focus = $state("");
+  let modelId = $state("");
+  let models = $state<TogetherChatModel[]>([]);
+  let modelsLoading = $state(true);
   let pdfs = $state<File[]>([]);
   let running = $state(false);
   let status = $state("");
@@ -78,16 +81,26 @@
       .then((c) => {
         config = c;
         configLoaded = true;
+        if (!modelId) modelId = c.defaultModel;
       })
       .catch(() => {
         error = COPY.errors.config;
         configLoaded = false;
       });
+
+    loadModels()
+      .then((payload) => {
+        models = payload.models;
+        if (!modelId) modelId = payload.defaultModel;
+        modelsLoading = false;
+      })
+      .catch(() => {
+        modelsLoading = false;
+      });
   });
 
   function applySuggestion(s: Suggestion | StarterCollection) {
     input = s.value;
-    focus = s.focus;
     validationError = "";
     error = "";
     requestAnimationFrame(() => {
@@ -153,7 +166,7 @@
     const form = new FormData();
     form.set("urls", urls);
     form.set("text", text);
-    form.set("focus", focus);
+    form.set("model", modelId || config.defaultModel);
     for (const file of pdfs) form.append("pdfs", file);
 
     await runDigestStream(form, {
@@ -204,8 +217,10 @@
           <EmptyState />
           <DigestComposer
             bind:input
-            bind:focus
+            bind:modelId
             bind:pdfs
+            {models}
+            {modelsLoading}
             {running}
             {validationError}
             prominent
@@ -273,8 +288,10 @@
       {#if !showEmptyState}
         <DigestComposer
           bind:input
-          bind:focus
+          bind:modelId
           bind:pdfs
+          {models}
+          {modelsLoading}
           {running}
           {validationError}
           onSubmit={submit}

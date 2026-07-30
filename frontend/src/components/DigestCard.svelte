@@ -35,19 +35,19 @@
     {/if}
   </p>
   <dl class="card-fields">
-    <div>
-      <dt>{COPY.results.whatChanged}</dt>
-      <dd>{card.whatChanged}</dd>
+    <div class="card-field card-field--action">
+      <dt>{COPY.results.whatToDo}</dt>
+      <dd class="card-action">{card.whatToDo}</dd>
     </div>
-    <div>
+    <div class="card-field">
       <dt>{COPY.results.whyCare}</dt>
       <dd>{card.whyCare}</dd>
     </div>
-    <div>
-      <dt>{COPY.results.whatToDo}</dt>
-      <dd>{card.whatToDo}</dd>
+    <div class="card-field">
+      <dt>{COPY.results.whatChanged}</dt>
+      <dd>{card.whatChanged}</dd>
     </div>
-    <div>
+    <div class="card-field card-field--muted">
       <dt>{COPY.results.verdictReason}</dt>
       <dd>{card.worthReason}</dd>
     </div>
