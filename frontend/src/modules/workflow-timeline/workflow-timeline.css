@@ -86,6 +86,7 @@
 
 .workflow-timeline__chart {
   min-width: 0;
+  direction: ltr;
 }
 
 .workflow-timeline__axis,
@@ -232,7 +233,8 @@
 
 @keyframes workflow-progress {
   to {
-    background-position-x: -20px;
+    /* Positive offset so running stripes move left → right. */
+    background-position-x: 20px;
   }
 }
 

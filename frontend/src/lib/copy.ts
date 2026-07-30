@@ -61,7 +61,7 @@ export const COPY = {
   },
   timeline: {
     title: "Execution timeline",
-    hint: "Clock time across Workflow tasks. Tap or hover a stage for duration.",
+    hint: "Time flows left to right. Tap or hover a stage for duration.",
     waiting: "Waiting for Workflow tasks…",
     live: "LIVE",
   },
