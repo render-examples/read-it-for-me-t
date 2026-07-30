@@ -2,9 +2,9 @@
 
 [![Read It For Me](static/images/screenshot.png)](https://read-it-for-me.onrender.com/)
 
-Digest for links, pasted text, and PDFs. Each item answers what changed, why it matters, what to do, and whether it is worth reading fully.
+Paste links, notes, or PDFs. Get action-first digest cards and a short summary of what to do, what to read, and what to skip. Inference runs on [Together AI](https://www.together.ai/) inside [Render Workflows](https://render.com/docs/workflows).
 
-[Live demo](https://read-it-for-me.onrender.com/) · [GitHub](https://github.com/render-examples/read-it-for-me-t)
+[Live demo](https://read-it-for-me.onrender.com/) · [GitHub](https://github.com/render-examples/read-it-for-me-t) · [Workflows docs](https://render.com/docs/workflows)
 
 <p align="left">
   <a href="https://render.com/deploy?repo=https://github.com/render-examples/read-it-for-me-t">
@@ -19,6 +19,7 @@ Inference by [<img src="static/images/together-ai-logo.png" alt="" height="18" /
 ## Table of contents
 
 - [Highlights](#highlights)
+- [What this demo shows](#what-this-demo-shows)
 - [Overview](#overview)
 - [Architecture](#architecture)
 - [Usage](#usage)
@@ -31,21 +32,28 @@ Inference by [<img src="static/images/together-ai-logo.png" alt="" height="18" /
 
 ## Highlights
 
-- **Action-first cards**: every item leads with `Do this`, then why it matters, what changed, and a `read` / `skim` / `skip` call. Summary lists cap at 5.
-- **Together model picker**: searchable dropdown of Together chat models (live from `/v1/models`), passed into Workflow analyze/synthesize tasks.
-- **Composer-first empty state**: topic chips and collection starters (news, ideas, science, culture) so a first run needs almost no typing.
-- **Live progress** over Server-Sent Events while workflow tasks run on Render, with a detachable left-to-right Gantt timeline (`fetch` → `analyze` → `synthesize`).
-- **Change tracking** via Postgres snapshots: repeat sources compare against the last digest.
+- **Action-first cards**: each item leads with **Do this**, then why it matters, what changed, and a `read` / `skim` / `skip` call. Summary lists cap at 5.
+- **Together model picker**: searchable list of Together chat models from `GET /v1/models`. The selected model runs analyze and synthesize.
+- **Live Workflow timeline**: Server-Sent Events drive a detachable left-to-right Gantt (`fetch` → `analyze` → `synthesize`).
+- **Change tracking**: Postgres snapshots compare repeat sources against the last digest.
+- **Split responsibilities**: the web service orchestrates; Together inference stays inside Workflow tasks.
+
+## What this demo shows
+
+| Piece | Role |
+| --- | --- |
+| **[Render Workflows](https://render.com/docs/workflows)** | Durable `fetch_item`, `analyze_item`, and `synthesize_digest` tasks with retries and timeouts |
+| **[Together AI](https://www.together.ai/)** | Chat completions for per-item cards and the digest summary; model chosen in the UI |
+| **[Render Postgres](https://render.com/docs/postgresql)** | Digest runs, item results, and source snapshots |
+| **[Render Web Services](https://render.com/docs/web-services)** | Svelte UI, Express API, SSE streaming, and `GET /api/models` |
 
 ## Overview
 
-Read It For Me is for people who skim newsletters, release notes, and long threads and want a structured digest instead of a paragraph of fluff.
+Read It For Me turns a pile of reading into decisions. Paste URLs (one per line), text blocks, or PDFs, pick a Together chat model if you want something other than the default, and build a digest. Cards stream in as each item finishes. When analysis completes, a synthesis pass returns a headline plus `doToday`, `readNow`, and `skip` lists.
 
-You submit URLs (one per line), pasted text blocks, optional PDFs, and a Together chat model from the searchable picker (default: `meta-llama/Llama-3.3-70B-Instruct-Turbo`). The Express server starts Render Workflow tasks, polls until each completes, and streams status, activity, stage timing, and per-item cards back to the browser. When all items are analyzed, a synthesis task produces a headline plus `doToday`, `readNow`, and `skip` lists.
+Default model: `meta-llama/Llama-3.3-70B-Instruct-Turbo` (override with the picker or `TOGETHER_MODEL`).
 
-The web service lists Together chat models via `GET /api/models` (needs `TOGETHER_API_KEY`). Inference still runs only inside Workflow tasks (`analyze_item`, `synthesize_digest`) using the selected model. Prior snapshots from Postgres feed into the analyze prompt so the model can comment on what changed since the last run.
-
-**Current MVP gaps:** PDF uploads are accepted but text extraction is a placeholder. The workflow service is created manually in the Render Dashboard (not in `render.yaml`), matching the pattern used in other Render Workflows examples.
+**MVP limits:** PDF uploads are accepted, but text extraction is still a placeholder. The Workflow service is created in the Dashboard (not in `render.yaml`), same pattern as other Workflows examples in this workspace.
 
 ## Architecture
 
@@ -55,7 +63,7 @@ The web service lists Together chat models via `GET /api/models` (needs `TOGETHE
 
 | Layer | Folder | Role |
 |-------|--------|------|
-| UI | `frontend/` | Svelte 5 composer, SSE client, digest cards, detachable timeline |
+| UI | `frontend/` | Composer, model picker, SSE client, cards, timeline |
 | API | `server/` | Express routes, orchestrator, Postgres, static SPA |
 | Tasks | `workflow/` | `fetch_item`, `analyze_item`, `synthesize_digest` |
 | Contracts | `shared/` | Types and Render URL helpers |
@@ -64,13 +72,13 @@ The web service lists Together chat models via `GET /api/models` (needs `TOGETHE
 
 ### Web UI
 
-1. Open the [live demo](https://read-it-for-me.onrender.com/) (or your deploy).
+1. Open the [live demo](https://read-it-for-me.onrender.com/).
 2. Pick a topic chip or collection, or paste URLs / text / PDFs.
-3. Optionally search and pick a Together AI chat model (defaults to Llama 3.3 70B).
-4. Click **Build digest**. Cards stream in as each item finishes; the summary panel loads at the end.
-5. Use **New digest** to clear results and start again. Detach the execution timeline when you want a larger Gantt view.
+3. Optionally search and select a Together chat model.
+4. Click **Build digest**. Cards stream in; the summary appears at the end.
+5. Use **New digest** to start over. Detach the timeline for a larger Gantt view.
 
-### API (SSE)
+### API
 
 `POST /api/digest` accepts `multipart/form-data`:
 
@@ -78,21 +86,129 @@ The web service lists Together chat models via `GET /api/models` (needs `TOGETHE
 |-------|------|-------|
 | `urls` | string | Newline-separated URLs (max 20 lines) |
 | `text` | string | Newline-separated text blocks |
-| `model` | string | Optional Together chat model id (defaults to `TOGETHER_MODEL`) |
+| `model` | string | Optional Together chat model id |
 | `pdfs` | file[] | Optional PDFs, max 5 files, 3 MB each |
 
-Also: `GET /api/models` returns `{ models, defaultModel, source }` for the picker.
+SSE events: `status`, `activity`, `progress`, `stage`, `card`, `done`, `error`.
 
-Response is `text/event-stream` with events: `status`, `activity`, `progress`, `stage`, `card`, `done`, `error`.
-
-Requires `RENDER_API_KEY` and `DATABASE_URL` on the web service. Returns `503` if either is missing.
-
-### Health
+`GET /api/models` returns `{ models, defaultModel, source }` for the picker (`source` is `together` or `fallback`).
 
 ```bash
 curl https://read-it-for-me.onrender.com/health
 # {"ok":true}
 ```
+
+## Deploy on Render
+
+### Prerequisites
+
+- [Render account](https://dashboard.render.com/register?utm_source=github&utm_medium=referral&utm_campaign=ojus_demos&utm_content=readme_link)
+- [Together AI API key](https://api.together.ai/)
+- [Render API key](https://render.com/docs/api#1-create-an-api-key)
+
+### 1. Deploy the Blueprint
+
+<p align="left">
+  <a href="https://render.com/deploy?repo=https://github.com/render-examples/read-it-for-me-t">
+    <img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render" height="28" />
+  </a>
+</p>
+
+Or apply [`render.yaml`](render.yaml) from the Dashboard. That creates:
+
+- **Web service** `read-it-for-me` — `node dist/server/index.js`, health check `/health`
+- **Postgres** `read-it-for-me-db` — wired to `DATABASE_URL`
+
+Set on the web service:
+
+- `RENDER_API_KEY`
+- `TOGETHER_API_KEY` (required for the live model catalog)
+
+### 2. Create the Workflow service
+
+Blueprints do not create Workflow runners yet. In the Dashboard:
+
+1. **New → Workflow** (same repo).
+2. **Build:** `npm install && npm run build`
+3. **Start:** `node dist/workflow/index.js`
+4. **Env:**
+   - `TOGETHER_API_KEY` (required for inference)
+   - `DATABASE_URL` (same Postgres, internal URL)
+   - `TOGETHER_MODEL` (optional)
+5. Confirm the slug is `read-it-for-me-workflow`, or set `WORKFLOW_SLUG` on the web service to match.
+
+### 3. Verify
+
+1. `GET /health` returns `{"ok":true}`
+2. `GET /api/models` returns `"source":"together"` and a long model list
+3. Build a digest with at least one public URL or pasted text
+4. If cards never appear, check Workflow task logs in the Dashboard
+
+## Configuration
+
+### Web service (`read-it-for-me`)
+
+| Variable | Required | Default | If missing |
+|----------|----------|---------|------------|
+| `RENDER_API_KEY` | Yes (digest) | — | `/api/digest` returns 503 |
+| `TOGETHER_API_KEY` | Yes (model list) | — | `/api/models` returns only the default model (`source: fallback`) |
+| `TOGETHER_MODEL` | No | `meta-llama/Llama-3.3-70B-Instruct-Turbo` | Picker / form default |
+| `DATABASE_URL` | Yes (digest) | — | `/api/digest` returns 503 |
+| `WORKFLOW_SLUG` | No | `read-it-for-me-workflow` | Task paths won't match |
+| `GITHUB_REPO_URL` | No | `https://github.com/render-examples/read-it-for-me-t` | Deploy button target |
+| `POLL_INTERVAL_MS` | No | `3000` | Task poll interval |
+| `ENABLE_WORKFLOW_TIMELINE` | No | on | Set `0` to hide the Gantt |
+| `PORT` | No | `3000` | Set by Render in production |
+| `NODE_ENV` | No | — | `production` enables Postgres SSL |
+
+### Workflow service
+
+| Variable | Required | Default | If missing |
+|----------|----------|---------|------------|
+| `TOGETHER_API_KEY` | Yes | — | analyze / synthesize fail |
+| `DATABASE_URL` | Recommended | — | unused for persistence here (web service writes) |
+| `TOGETHER_MODEL` | No | `meta-llama/Llama-3.3-70B-Instruct-Turbo` | used when the client omits `model` |
+
+Use the **same** Together key on web and Workflow. Web lists models; Workflow runs inference.
+
+## Operations
+
+- **Health:** `GET /health`
+- **Logs:** Dashboard → service → Logs. Task output is on the Workflow service.
+- **Database:** `digest_runs`, `source_snapshots`, and `digest_items` are created on web startup when `DATABASE_URL` is set.
+- **Disk:** PDF uploads are read in memory and deleted. Render's filesystem is ephemeral.
+- **Idle:** Free web services spin down after inactivity; the first request after idle can be slow. Free Postgres expires after 30 days.
+
+## Project structure
+
+```
+read-it-for-me/
+├── frontend/src/
+│   ├── App.svelte
+│   ├── components/             # Composer, ModelPicker, cards, chrome
+│   ├── lib/                    # api, copy, phase, composer helpers
+│   └── modules/workflow-timeline/
+├── server/
+│   ├── index.ts
+│   ├── routes/                 # health, digest, models
+│   └── lib/                    # db, orchestrator, sse, together-models
+├── workflow/
+│   ├── index.ts
+│   ├── tasks/                  # fetch, analyze, synthesize
+│   └── lib/together.ts
+├── shared/
+├── static/images/
+├── render.yaml
+└── vite.config.ts
+```
+
+**Where to change things**
+
+- Prompts / JSON shape: `workflow/tasks/analyze.ts`, `workflow/tasks/synthesize.ts`
+- Model catalog: `server/lib/together-models.ts`, `server/routes/models.ts`
+- SSE / orchestration: `server/lib/orchestrator.ts`, `shared/types.ts`
+- UI copy: `frontend/src/lib/copy.ts`
+- Schema: `server/lib/db.ts`
 
 ### Tests
 
@@ -101,138 +217,39 @@ npm test
 npm run build
 ```
 
-## Deploy on Render
-
-<p align="left">
-  <a href="https://render.com/deploy?repo=https://github.com/render-examples/read-it-for-me-t">
-    <img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render" height="28" />
-  </a>
-</p>
-
-Primary path: Blueprint for the web service and database, then a manual Workflow service.
-
-### 1. Push to GitHub
-
-This repo lives at [render-examples/read-it-for-me-t](https://github.com/render-examples/read-it-for-me-t). Fork or connect it if you are deploying your own copy.
-
-### 2. Deploy the Blueprint
-
-Use the **Deploy to Render** button in the app UI, or apply [`render.yaml`](render.yaml) from the Render Dashboard. This creates:
-
-- **Web service** `read-it-for-me` — `node dist/server/index.js`, health check `/health`
-- **Postgres** `read-it-for-me-db` — connection string wired to `DATABASE_URL`
-
-Set `RENDER_API_KEY` and `TOGETHER_API_KEY` on the web service (Account Settings → API Keys for Render; Together dashboard for the model key).
-
-### 3. Create the Workflow service
-
-The Blueprint does not include the workflow runner. In the Dashboard:
-
-1. **New → Workflow** (link the same repo).
-2. **Build command:** `npm install && npm run build`
-3. **Start command:** `node dist/workflow/index.js`
-4. **Environment:**
-   - `TOGETHER_API_KEY` — required
-   - `DATABASE_URL` — same Postgres as the web service (internal URL on the private network)
-   - `TOGETHER_MODEL` — optional, defaults to Llama 3.3 70B Instruct Turbo
-5. Note the workflow **slug** (default expectation: `read-it-for-me-workflow`). Set `WORKFLOW_SLUG` on the web service if yours differs.
-
-### 4. Verify
-
-- `GET /health` returns `{"ok":true}`
-- Submit a digest from the UI with at least one URL
-- Check workflow task logs in the Render Dashboard if cards never appear
-
-## Configuration
-
-### Web service (`read-it-for-me`)
-
-| Variable | Required | Default | If missing |
-|----------|----------|---------|------------|
-| `RENDER_API_KEY` | Yes (for digest) | — | `/api/digest` returns 503; `/health` still works |
-| `TOGETHER_API_KEY` | Yes (for model list) | — | `/api/models` falls back to the default model only |
-| `TOGETHER_MODEL` | No | `meta-llama/Llama-3.3-70B-Instruct-Turbo` | Picker default / form default |
-| `DATABASE_URL` | Yes (for digest) | — | `/api/digest` returns 503; persistence disabled |
-| `WORKFLOW_SLUG` | No | `read-it-for-me-workflow` | Task paths won't match your workflow |
-| `GITHUB_REPO_URL` | No | `https://github.com/render-examples/read-it-for-me-t` | Deploy button points at default repo |
-| `POLL_INTERVAL_MS` | No | `3000` | Task poll interval |
-| `ENABLE_WORKFLOW_TIMELINE` | No | on (unset) | Set to `0` to hide the detachable Gantt and fall back to the activity log |
-| `PORT` | No | `3000` | Set by Render in production |
-| `NODE_ENV` | No | — | `production` enables Postgres SSL |
-
-### Workflow service
-
-| Variable | Required | Default | If missing |
-|----------|----------|---------|------------|
-| `TOGETHER_API_KEY` | Yes | — | `analyze_item` / `synthesize_digest` fail |
-| `DATABASE_URL` | Recommended | — | Snapshots not written from workflow side (web service handles persistence) |
-| `TOGETHER_MODEL` | No | `meta-llama/Llama-3.3-70B-Instruct-Turbo` | Falls back to default model |
-
-## Operations
-
-- **Health check:** `GET /health` — used by Render on the web service.
-- **Logs:** Render Dashboard → service → Logs. Workflow task output appears on the Workflow service.
-- **Database:** Tables `digest_runs`, `source_snapshots`, `digest_items` are created on web service startup when `DATABASE_URL` is set.
-- **Ephemeral disk:** Uploaded PDFs are read in memory and deleted; do not rely on local filesystem persistence on Render.
-- **Free tier:** Web services spin down after inactivity; first request after idle may be slow. Free Postgres expires after 30 days.
-
-## Project structure
-
-```
-read-it-for-me/
-├── frontend/src/
-│   ├── App.svelte              # Phases, streaming, layout shell
-│   ├── components/             # Composer, cards, empty state, chrome
-│   ├── lib/                    # api, copy, phase, composer helpers
-│   └── modules/
-│       └── workflow-timeline/  # Detachable Gantt (delete folder + App import to remove)
-├── server/
-│   ├── index.ts                # Express entry, static files, config route
-│   ├── routes/                 # health, digest
-│   └── lib/                    # db, orchestrator, sse
-├── workflow/
-│   ├── index.ts                # Task registration
-│   ├── tasks/                  # fetch, analyze, synthesize
-│   └── lib/together.ts         # Together AI adapter
-├── shared/                     # types.ts, renderUrls.ts
-├── static/images/              # README screenshots and diagrams
-├── render.yaml                 # Web + Postgres Blueprint
-└── vite.config.ts              # Builds frontend → dist/client
-```
-
-**Where to change things**
-
-- Digest prompts and LLM JSON shape: `workflow/tasks/analyze.ts`, `workflow/tasks/synthesize.ts`
-- SSE event shape: `server/lib/orchestrator.ts`, `shared/types.ts`
-- UI copy and phases: `frontend/src/lib/copy.ts`, `frontend/src/lib/phase.ts`
-- UI layout and streaming client: `frontend/src/App.svelte`, `frontend/src/lib/api.ts`
-- Postgres schema: `server/lib/db.ts`
-
 ## Troubleshooting
+
+**Picker shows only one model / `source: fallback`**
+
+Set `TOGETHER_API_KEY` on the **web** service and redeploy. The Workflow key alone is not enough for `/api/models`.
 
 **`RENDER_API_KEY is not configured`**
 
-Set the key on the web service. The server starts without it, but digest requests are blocked.
+Set it on the web service. Health still works; digests do not.
 
 **`DATABASE_URL is not configured`**
 
-Wire Postgres from the Blueprint on the web service. Digest requires persistence for snapshot diffs.
+Wire Postgres from the Blueprint. Digests need persistence for snapshot diffs.
 
 **Tasks fail immediately / wrong workflow**
 
-Confirm `WORKFLOW_SLUG` on the web service matches the slug shown on your Workflow service in the Dashboard. Task names are `{slug}/fetch_item`, `{slug}/analyze_item`, `{slug}/synthesize_digest`.
+Match `WORKFLOW_SLUG` to the Workflow slug in the Dashboard. Task names are `{slug}/fetch_item`, `{slug}/analyze_item`, `{slug}/synthesize_digest`.
 
-**Together errors**
+**Together errors during analyze/synthesize**
 
-Check `TOGETHER_API_KEY` on the Workflow service and that the model name in `TOGETHER_MODEL` is available on your Together account.
+Check `TOGETHER_API_KEY` on the **Workflow** service and that the selected model is available on your Together account.
+
+**Failed to fetch URL: HTTP 403**
+
+Some sites block scrapers (for example many wikis). Paste the article text instead, or use an open RSS/HTML source.
 
 **PDF content is generic**
 
-Expected in MVP: `fetch_item` returns placeholder text for PDFs until real extraction is added.
+Expected in MVP: `fetch_item` returns placeholder text until extraction is wired.
 
 **Stale UI after deploy**
 
-Run `npm run build` before deploy. The web service serves `dist/client`; Vite dev server is not used in production.
+The web service serves `dist/client`. Confirm the latest deploy is live in the Dashboard.
 
 ## License
 
