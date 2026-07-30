@@ -4,8 +4,6 @@
 
 Paste links, notes, or PDFs. Get action-first digest cards and a short summary of what to do, what to read, and what to skip. Inference runs on [Together AI](https://www.together.ai/) inside [Render Workflows](https://render.com/docs/workflows).
 
-**Live demo:** [https://read-it-for-me.onrender.com/](https://read-it-for-me.onrender.com/)
-
 <p>
   <a href="https://render.com/deploy?repo=https://github.com/render-examples/read-it-for-me-t">
     <img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render" />
