@@ -48,6 +48,20 @@ export type SseProgressPayload = {
   elapsedSec: number;
 };
 
+/** Clock-time stage events for the detachable workflow timeline module. */
+export type DigestStageName = "fetch" | "analyze" | "synthesize";
+
+export type SseStagePayload = {
+  rowId: string;
+  rowLabel: string;
+  stage: DigestStageName;
+  status: "started" | "completed" | "failed";
+  at: string;
+  attempt?: number;
+  latencyMs?: number;
+  message?: string;
+};
+
 export type SseCardPayload = ItemAnalysis & { index: number };
 
 export type SseDonePayload = DigestResult;

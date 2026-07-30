@@ -32,7 +32,7 @@ Inference by [<img src="static/images/together-ai-logo.png" alt="" height="18" /
 ## Highlights
 
 - **Action-oriented cards**, not generic summaries: every item gets `whatChanged`, `whyCare`, `whatToDo`, and a `read` / `skim` / `skip` verdict.
-- **Live progress** over Server-Sent Events while workflow tasks run on Render.
+- **Live progress** over Server-Sent Events while workflow tasks run on Render, with a detachable Gantt-style execution timeline (fetch → analyze → synthesize).
 - **Change tracking** via Postgres snapshots: repeat sources compare against the last digest.
 - **Separated layers**: Svelte UI, Express API, and workflow tasks live in distinct folders with shared types in `shared/`.
 - **Together AI stays in workflows**: the web service orchestrates tasks; it never calls the LLM directly.
@@ -141,6 +141,7 @@ The Blueprint does not include the workflow runner. In the Dashboard:
 | `WORKFLOW_SLUG` | No | `read-it-for-me-workflow` | Task paths won't match your workflow |
 | `GITHUB_REPO_URL` | No | `https://github.com/ojusave/read-it-for-me` | Deploy button points at default repo |
 | `POLL_INTERVAL_MS` | No | `3000` | Task poll interval |
+| `ENABLE_WORKFLOW_TIMELINE` | No | on (unset) | Set to `0` to hide the detachable Gantt and fall back to the activity log |
 | `PORT` | No | `3000` | Set by Render in production |
 | `NODE_ENV` | No | — | `production` enables Postgres SSL |
 
@@ -165,6 +166,8 @@ The Blueprint does not include the workflow runner. In the Dashboard:
 ```
 read-it-for-me/
 ├── frontend/src/          # Svelte UI (components, api client)
+│   └── modules/
+│       └── workflow-timeline/  # Detachable Gantt (delete folder + App import to remove)
 ├── server/
 │   ├── index.ts           # Express entry, static files, config route
 │   ├── routes/            # health, digest
