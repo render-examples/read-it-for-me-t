@@ -113,45 +113,6 @@ Default model: `meta-llama/Llama-3.3-70B-Instruct-Turbo`. PDF uploads are accept
 | `WORKFLOW_SLUG` | Web | Must match the Dashboard workflow slug |
 | `ENABLE_WORKFLOW_TIMELINE` | Web | Set `0` to hide the Gantt |
 
-## Project Structure
-
-```
-frontend/src/     Svelte 5 UI (composer, ModelPicker, cards, timeline)
-server/           Express API, orchestrator, SSE, Postgres, models route
-workflow/         fetch_item, analyze_item, synthesize_digest
-shared/           Types and Render URL helpers
-render.yaml       Blueprint (web + Postgres)
-```
-
-| Concern | Where to edit |
-| --- | --- |
-| Prompts / JSON shape | `workflow/tasks/analyze.ts`, `workflow/tasks/synthesize.ts` |
-| Model catalog | `server/lib/together-models.ts` |
-| SSE / orchestration | `server/lib/orchestrator.ts` |
-| UI copy | `frontend/src/lib/copy.ts` |
-
-`POST /api/digest` accepts multipart (`urls`, `text`, optional `model`, optional `pdfs`) and streams SSE. `GET /api/models` returns the picker catalog.
-
-## Troubleshooting
-
-| Problem | Solution |
-| --- | --- |
-| Picker shows one model / `source: fallback` | Set `TOGETHER_API_KEY` on the **web** service and redeploy |
-| Digests fail to start | Set `RENDER_API_KEY` and `DATABASE_URL` on the web service |
-| Tasks fail / wrong workflow | Match `WORKFLOW_SLUG` to the Dashboard slug |
-| Together errors on analyze/synthesize | Set `TOGETHER_API_KEY` on the **Workflow** service |
-| `Failed to fetch URL: HTTP 403` | Site blocks scrapers; paste the text instead |
-| PDF content is generic | Expected in MVP until extraction is wired |
-
-Logs: web service and Workflow service logs in the Render Dashboard.
-
-## Tests
-
-```bash
-npm test
-npm run build
-```
-
 ## Learn More
 
 **Render:** [Workflows](https://render.com/docs/workflows) · [Postgres](https://render.com/docs/databases) · [Deploy button](https://render.com/docs/deploy-to-render-button) · [Discord](https://discord.gg/gvC7ceS9YS)
