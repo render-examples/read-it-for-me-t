@@ -226,8 +226,7 @@
             {models}
             {modelsLoading}
             {running}
-            {validationError}
-            prominent
+            bind:validationError
             onSubmit={submit}
           />
           <TopicStarters onSelect={applySuggestion} />
@@ -297,7 +296,7 @@
           {models}
           {modelsLoading}
           {running}
-          {validationError}
+          bind:validationError
           onSubmit={submit}
         />
       {/if}

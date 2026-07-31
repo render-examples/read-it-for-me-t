@@ -11,8 +11,7 @@
     models = [],
     modelsLoading = false,
     running = false,
-    validationError = "",
-    prominent = false,
+    validationError = $bindable(""),
     onSubmit,
   }: {
     input?: string;
@@ -22,7 +21,6 @@
     modelsLoading?: boolean;
     running?: boolean;
     validationError?: string;
-    prominent?: boolean;
     onSubmit: () => void;
   } = $props();
 
@@ -40,6 +38,7 @@
     const next = el.files ? Array.from(el.files) : [];
     pdfs = [...pdfs, ...next];
     el.value = "";
+    if (next.length) validationError = "";
   }
 
   function removePdf(index: number) {
@@ -53,19 +52,19 @@
 
 <form
   class="composer"
-  class:composer-prominent={prominent}
   onsubmit={(e) => {
     e.preventDefault();
     onSubmit();
   }}
 >
-  <div class="composer-block">
+  <div class="field">
     <label class="field-label" for="digest-input">{COPY.composer.inputLabel}</label>
     <p class="field-hint" id="digest-input-hint">{COPY.composer.inputHint}</p>
     <textarea
       id="digest-input"
       rows="4"
       bind:value={input}
+      oninput={() => (validationError = "")}
       onkeydown={onKeydown}
       placeholder={COPY.composer.inputPlaceholder}
       disabled={running}
@@ -84,8 +83,9 @@
       loading={modelsLoading}
     />
 
-    <div class="composer-pdfs">
+    <div class="field">
       <span class="field-label" id="pdf-label">{COPY.composer.pdfsLabel}</span>
+      <p class="field-hint" id="pdf-hint">{COPY.composer.pdfsHint}</p>
       <input
         bind:this={fileInput}
         type="file"
@@ -94,36 +94,38 @@
         class="visually-hidden"
         disabled={running}
         aria-labelledby="pdf-label"
+        aria-describedby="pdf-hint"
         onchange={onFileChange}
       />
       <button
         type="button"
-        class="btn btn-ghost pdf-attach"
+        class="btn btn-ghost"
         disabled={running}
         onclick={openFilePicker}
       >
         {COPY.composer.attachPdf}
       </button>
-      {#if pdfs.length}
-        <ul class="pdf-list" aria-label={COPY.composer.pdfCount(pdfs.length)}>
-          {#each pdfs as file, i}
-            <li class="pdf-item">
-              <span class="pdf-name" title={file.name}>{file.name}</span>
-              <button
-                type="button"
-                class="pdf-remove"
-                disabled={running}
-                aria-label={`${COPY.composer.removePdf} ${file.name}`}
-                onclick={() => removePdf(i)}
-              >
-                {COPY.composer.removePdf}
-              </button>
-            </li>
-          {/each}
-        </ul>
-      {/if}
     </div>
   </div>
+
+  {#if pdfs.length}
+    <ul class="pdf-list" aria-label={COPY.composer.pdfCount(pdfs.length)}>
+      {#each pdfs as file, i}
+        <li class="pdf-item">
+          <span class="pdf-name" title={file.name}>{file.name}</span>
+          <button
+            type="button"
+            class="pdf-remove"
+            disabled={running}
+            aria-label={`${COPY.composer.removePdf} ${file.name}`}
+            onclick={() => removePdf(i)}
+          >
+            {COPY.composer.removePdf}
+          </button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
 
   {#if validationError}
     <p class="composer-error" id="digest-validation" role="alert">{validationError}</p>

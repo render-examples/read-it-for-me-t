@@ -99,7 +99,7 @@
   }
 </script>
 
-<div class="model-picker">
+<div class="field">
   <label class="field-label" for="model-search">{COPY.composer.modelLabel}</label>
   <p class="field-hint" id="model-hint">{COPY.composer.modelHint}</p>
 
@@ -128,6 +128,16 @@
         activeIndex = -1;
       }}
     />
+
+    <svg
+      class="model-caret"
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      aria-hidden="true"
+    >
+      <path d="M2 4.5 6 8.5 10 4.5" fill="none" stroke="currentColor" stroke-width="1.5" />
+    </svg>
 
     {#if open && !disabled && !loading}
       <ul
@@ -162,8 +172,4 @@
       </ul>
     {/if}
   </div>
-
-  {#if selected}
-    <p class="model-selected-id">{selected.id}</p>
-  {/if}
 </div>
